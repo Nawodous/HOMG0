@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>HOMG0 局域网联机 Demo</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#0d1117;--panel:#171d25;--panel2:#1e2631;--line:#303b4b;--text:#e9eef6;
+  --muted:#8f9db0;--green:#59ce91;--red:#df7178;--gold:#f2cb68;--blue:#65a1dc;
+}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif}
+button,input{font:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+.app{min-height:100vh}
+.topbar{height:72px;padding:0 22px;display:flex;align-items:center;justify-content:space-between;background:#151b23;border-bottom:1px solid #2a3442}
+.title{font-size:21px;font-weight:800}.subtitle{font-size:12px;color:var(--muted);margin-top:4px}
+.pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pill{padding:7px 12px;border-radius:999px;background:#293445;font-size:12px}.pill.mine{background:#495d92}.pill.enemy{background:#75424d}.pill.good{background:#2d6a50}
+.main{display:grid;grid-template-columns:minmax(720px,1fr) 420px;min-height:calc(100vh - 72px)}
+.board-area{position:relative;padding:20px;display:flex;justify-content:center;align-items:flex-start;overflow:auto}
+.board{position:relative;width:790px;height:720px;min-width:790px}.fx-layer{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visible}.attack-arrow{position:absolute;height:0;border-top:4px solid #f2cb68;filter:drop-shadow(0 0 5px #f2cb68);transform-origin:0 50%;animation:attackArrow 1s ease-out forwards}.move-arrow{position:absolute;height:0;border-top:10px solid #58a6ff;filter:drop-shadow(0 0 7px #58a6ff);transform-origin:0 50%;animation:moveArrow 1s cubic-bezier(.2,.8,.2,1) forwards}.move-arrow::after{content:'';position:absolute;right:-2px;top:-16px;width:0;height:0;border-top:16px solid transparent;border-bottom:16px solid transparent;border-left:28px solid #58a6ff;filter:drop-shadow(0 0 6px #58a6ff)}.attack-arrow::after{content:'';position:absolute;right:-2px;top:-9px;width:0;height:0;border-top:9px solid transparent;border-bottom:9px solid transparent;border-left:18px solid #f2cb68;filter:drop-shadow(0 0 4px #f2cb68)}.attack-arrow::before{content:'';position:absolute;left:-5px;top:-6px;width:12px;height:12px;border-radius:50%;background:#ffe59b;box-shadow:0 0 16px 5px #f2cb6866}.corpse{position:absolute;width:54px;height:36px;border-radius:50%;border:2px solid #4e5965;background:radial-gradient(ellipse at center,#555f68 0%,#303740 60%,#20262c 100%);box-shadow:0 4px 10px #000a;transform:translate(-50%,-50%) rotate(-18deg);animation:corpseFade 1s ease-out forwards;z-index:19}.corpse::after{content:'☠';position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);font-size:20px;color:#9aa4ae;text-shadow:0 1px 3px #000}.corpse .corpse-label{position:absolute;left:50%;top:100%;transform:translate(-50%,4px);font-size:9px;color:#7f8993;white-space:nowrap}.grid{position:absolute;inset:48px 38px 24px}
+.row{position:absolute;left:0;width:100%;display:flex;justify-content:center;gap:12px}.r1{top:0}.r2{top:108px}.r3{top:216px}.r4{top:324px}.r5{top:432px}.r6{top:540px}
+.cell{position:relative;width:116px;height:90px;border:2px solid #394555;border-radius:13px;background:linear-gradient(145deg,#222a35,#1d242e);cursor:pointer;transition:.16s ease}
+.cell:hover{transform:translateY(-1px);border-color:#6e7e95}.cell.move{box-shadow:inset 0 0 0 3px rgba(89,206,145,.9);background:linear-gradient(145deg,#233b30,#1d2f27)}
+.cell.shoot{box-shadow:inset 0 0 0 3px rgba(223,113,120,.95);background:linear-gradient(145deg,#45272c,#2f2024)}
+.cell.deployable{box-shadow:inset 0 0 0 3px rgba(101,161,220,.8);background:linear-gradient(145deg,#24354a,#202c3c)}
+.fort{background:linear-gradient(145deg,#4c3924,#362b1d);border-color:#a98042}.stairs{background:linear-gradient(145deg,#30375a,#282f4b);border-color:#777fc2}
+.coord{position:absolute;right:8px;top:6px;color:#68778c;font-size:10px}.terrain{position:absolute;left:8px;top:6px;color:#94a1b4;font-size:10px}.symbol{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);font-size:25px;opacity:.6}
+.unit{position:absolute;left:50%;top:56%;transform:translate(-50%,-50%);width:56px;height:56px;border:3px solid #d8e0ea;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;box-shadow:0 7px 18px #0008;z-index:4;pointer-events:none}
+.unit.a{background:#98414d}.unit.d{background:#376e9c}.unit.new{box-shadow:0 0 0 3px #f2cb6858,0 7px 18px #0008}.unit.sel{outline:4px solid var(--gold);outline-offset:3px}
+.unit .mini{position:absolute;bottom:-10px;display:flex;gap:3px}.badge{min-width:19px;height:19px;border-radius:6px;padding:0 4px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;border:1px solid rgba(255,255,255,.18);background:#232c38}
+.badge.yes{background:#2d6a50}.badge.no{background:#323b49;color:#7d8998}.badge.hit{background:#8d3d47;color:#fff}.badge.fresh{background:#7c6732;color:#ffe5a1}
+.anim-move{animation:moveFlash .5s ease}.anim-shot{animation:shotFlash .5s ease}.anim-hit{animation:hitFlash .55s ease}.anim-deploy{animation:deployPulse .7s ease}.anim-death{animation:deathFlash .65s ease}.impact{position:absolute;inset:12px;border-radius:50%;border:3px solid #f17c83;animation:impactFlash .65s ease;pointer-events:none;z-index:3}.impact::after{content:'×';position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);font-size:36px;font-weight:900;color:#f7a2a7;text-shadow:0 0 14px #b94750}.muzzle{position:absolute;width:16px;height:16px;border-radius:50%;background:#ffe397;box-shadow:0 0 22px 8px #f2cb6870;left:50%;top:35%;transform:translate(-50%,-50%);animation:muzzleFlash .35s ease;pointer-events:none;z-index:6}@keyframes impactFlash{0%{opacity:0;transform:scale(.4)}25%{opacity:1;transform:scale(1.15)}100%{opacity:0;transform:scale(1.45)}}@keyframes muzzleFlash{0%{opacity:0;transform:translate(-50%,-50%) scale(.3)}30%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(2.2)}}
+@keyframes moveFlash{0%{transform:translate(-50%,-50%) scale(.8);filter:brightness(1)}45%{transform:translate(-50%,-50%) scale(1.16);filter:brightness(1.5)}100%{transform:translate(-50%,-50%) scale(1)}}
+@keyframes shotFlash{0%,100%{filter:brightness(1)}25%{filter:brightness(1.8);box-shadow:0 0 0 8px #f2cb6844,0 7px 18px #0008}60%{filter:brightness(1)}}
+@keyframes hitFlash{0%{transform:translate(-50%,-50%)}20%{transform:translate(calc(-50% - 6px),-50%)}40%{transform:translate(calc(-50% + 6px),-50%)}60%{transform:translate(calc(-50% - 4px),-50%)}80%{transform:translate(calc(-50% + 3px),-50%)}100%{transform:translate(-50%,-50%)}}
+@keyframes deployPulse{0%{transform:translate(-50%,-50%) scale(.5);opacity:.1}55%{transform:translate(-50%,-50%) scale(1.13);opacity:1}100%{transform:translate(-50%,-50%) scale(1)}}
+@keyframes deathFlash{0%{opacity:1}40%{opacity:.85;filter:grayscale(1) brightness(1.8)}100%{opacity:0}}@keyframes moveArrow{0%{opacity:0;transform:rotate(var(--angle)) scaleX(.08)}12%{opacity:1;transform:rotate(var(--angle)) scaleX(1)}78%{opacity:1;transform:rotate(var(--angle)) scaleX(1)}100%{opacity:0;transform:rotate(var(--angle)) scaleX(.98)}}@keyframes attackArrow{0%{opacity:0;transform:rotate(var(--angle)) scaleX(.05)}12%{opacity:1;transform:rotate(var(--angle)) scaleX(1)}75%{opacity:1;transform:rotate(var(--angle)) scaleX(1)}100%{opacity:0;transform:rotate(var(--angle)) scaleX(.98)}}@keyframes corpseFade{0%{opacity:0;transform:translate(-50%,-50%) rotate(-18deg) scale(.7)}15%{opacity:1;transform:translate(-50%,-50%) rotate(-18deg) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) rotate(-18deg) scale(.94)}}
+.side{background:#121820;border-left:1px solid #2a3442;padding:14px;display:flex;flex-direction:column;gap:11px;overflow:auto}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.pt{font-size:13px;font-weight:800;margin-bottom:10px}.hint{font-size:12px;line-height:1.6;color:#aeb9c7}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px}.stat{background:#121820;border-radius:8px;padding:8px}.sl{font-size:10px;color:#7f8da0}.sv{margin-top:3px;font-size:13px;font-weight:800}
+.config-summary{font-size:11px;line-height:1.7;color:#aeb8c6}.unit-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.unit-buttons button{border:0;border-radius:8px;padding:9px 4px;background:#2c3747;color:#e1e7ef}.unit-buttons button.active{background:#5d5d9d}.unit-buttons button:disabled{opacity:.35;cursor:not-allowed}
+.selection{min-height:80px;font-size:12px;line-height:1.7;color:#bdc7d4}.rowbtn{display:grid;grid-template-columns:1fr 1fr;gap:7px}.btn{border:0;border-radius:8px;padding:10px;background:#303c4c;color:#fff}.btn.primary{background:#5969a6}.btn.danger{background:#873f49}.btn:disabled{opacity:.35;cursor:not-allowed}
+.unit-list{display:flex;flex-direction:column;gap:6px;max-height:290px;overflow:auto}.my-units-body.collapsed{display:none}.collapsible-head{width:100%;display:flex;align-items:center;justify-content:space-between;border:0;background:transparent;color:inherit;padding:0;text-align:left}.collapsible-head .chev{color:#8f9bad;font-size:12px}.urow{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;background:#121820;border-radius:8px;padding:7px}.uicon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}.uicon.a{background:#863b47}.uicon.d{background:#376789}.uinfo{font-size:11px}.uname{font-size:12px;font-weight:700}.subline{color:#8492a4;margin-top:2px}.ustate{display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end;max-width:155px}.log{height:180px;overflow:auto;background:#10161d;border-radius:8px;padding:8px;font-size:10px;line-height:1.65;color:#aab5c3}.log.collapsed{display:none}.log-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.log-toggle-icon{width:26px;height:26px;padding:0;border:0;border-radius:7px;background:#222c39;color:#dfe7f1;display:flex;align-items:center;justify-content:center}.log-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;border:0;border-radius:8px;padding:8px 10px;background:#222c39;color:#dfe7f1;font-size:12px}.log-toggle span{color:#8f9bad}.turn-start-overlay{position:fixed;top:72px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(4,8,13,.34);pointer-events:none;opacity:0;z-index:90}
+.game-modal{position:fixed;top:72px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(4,8,13,.48);z-index:120}.game-modal.hidden{display:none}.game-modal-card{width:min(420px,88vw);padding:22px;border:1px solid #4d5d76;border-radius:14px;background:#1b2430;box-shadow:0 22px 70px #000b;text-align:center}.game-modal-title{font-size:18px;font-weight:900}.game-modal-text{margin:10px 0 18px;color:#aeb9c7;font-size:12px;line-height:1.7}.game-modal-card .btn{min-width:120px}
+.chat-top,.chat-bottom{position:absolute;z-index:110;pointer-events:none;width:min(430px,42%);display:flex;flex-direction:column;gap:4px;font-size:18px;line-height:1.45}.chat-top{left:20px;top:20px;align-items:flex-start}.chat-bottom{right:20px;bottom:20px;align-items:flex-end}.chat-line{color:#eef3f9;text-shadow:0 2px 6px #000;opacity:0;animation:chatTextIn .15s ease-out forwards,chatTextOut .45s ease-in 1.55s forwards}.chat-line.mine{color:#dce8ff}.chat-line.enemy{color:#ffe1e4}.chat-dock{display:flex;gap:7px;padding:0}.chat-dock input{flex:1;min-width:0;border:1px solid #3c4a5e;border-radius:8px;padding:9px 11px;background:#0e141b;color:#fff;outline:none}.chat-dock button{border:0;border-radius:8px;padding:9px 15px;background:#5969a6;color:#fff}.chat-dock button:disabled{opacity:.4;cursor:not-allowed}@keyframes chatTextIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}@keyframes chatTextOut{to{opacity:0;transform:translateY(-4px)}}
+.turn-start-overlay.show{animation:turnStartOverlay 1s ease-out forwards}.turn-start-card{min-width:280px;padding:22px 34px;border:1px solid #64769a;border-radius:16px;background:rgba(25,33,45,.94);box-shadow:0 18px 55px #0008;text-align:center}.turn-start-label{font-size:13px;color:#99a7ba;letter-spacing:3px}.turn-start-name{margin-top:6px;font-size:30px;font-weight:900;text-shadow:0 0 18px rgba(255,255,255,.16)}@keyframes turnStartOverlay{0%{opacity:0}15%{opacity:1}75%{opacity:1}100%{opacity:0}}
+.login,.result{position:fixed;top:72px;left:0;right:0;bottom:0;background:#081018ee;display:flex;align-items:center;justify-content:center;z-index:100}.card{width:min(560px,94vw);max-height:92vh;overflow:auto;background:#1b232e;border:1px solid #3a485c;border-radius:16px;padding:22px;box-shadow:0 25px 70px #0009}.card h1{margin:0;font-size:24px}.card p{font-size:12px;line-height:1.75;color:#aab5c4}.sep{height:1px;background:#2d3745;margin:16px 0}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;color:#99a6b7}.field input,.field select{padding:10px;border-radius:8px;border:1px solid #3c4a5f;background:#10161e;color:#fff}.section-title{font-size:12px;font-weight:800;margin:15px 0 8px}.role-choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}.role-card{padding:11px;border:1px solid #39475a;border-radius:9px;background:#141a22;cursor:pointer}.role-card.active{border-color:#7084bd;background:#29334b}.role-card strong{display:block;font-size:13px}.role-card span{font-size:10px;color:#8f9bad}.codebox{margin-top:12px;border:1px dashed #5d7196;border-radius:10px;padding:10px;text-align:center;background:#172134}.room-code{font-size:24px;font-weight:900;letter-spacing:5px;color:#f2cb68}.result-box{text-align:center}.result-title{font-size:28px;font-weight:900}.result-detail{margin:16px 0;color:#b7c1cf;line-height:1.7}
+@media(max-width:1180px){.main{grid-template-columns:1fr}.side{border-left:0;border-top:1px solid #2a3442}.board-area{justify-content:flex-start}}
+</style>
+</head>
+<body>
+
+<div id="login" class="login">
+  <div class="card">
+    <h1>HOMG0 局域网联机</h1>
+    <p>房主创建房间时可以选择自己的阵营，并自定义兵种上限和进攻方增援。第二位玩家输入房主 IP 后打开此页面，再输入房间号加入。</p>
+
+    <div class="section-title">我的阵营（仅房主设置）</div>
+    <div class="role-choice">
+      <div id="roleA" class="role-card active" onclick="selectHostRole('attacker')"><strong>进攻方</strong><span>默认先手 · 有增援 · 最多推进至第一行</span></div>
+      <div id="roleD" class="role-card" onclick="selectHostRole('defender')"><strong>防守方</strong><span>阻止进攻方到达第一行 · 无限免费部署</span></div>
+    </div>
+
+    <div class="section-title">房间规则</div>
+    <label style="display:flex;align-items:center;gap:8px;margin:8px 0 10px;font-size:11px;color:#c4ceda;cursor:pointer"><input id="allowDeployAfterAction" type="checkbox"> 允许行动后部署单位 <span style="color:#7f8da0">（默认关闭）</span></label>
+    <div class="form-grid">
+      <div class="field"><label>进攻方增援量</label><input id="reinforcement" type="number" min="1" max="999" value="28"></div>
+      <div></div>
+      <div class="field"><label>进攻方步兵上限</label><input id="aInf" type="number" min="0" max="50" value="5"></div>
+      <div class="field"><label>防守方步兵上限</label><input id="dInf" type="number" min="0" max="50" value="4"></div>
+      <div class="field"><label>进攻方反坦克炮上限</label><input id="aAT" type="number" min="0" max="10" value="1"></div>
+      <div class="field"><label>防守方反坦克炮上限</label><input id="dAT" type="number" min="0" max="10" value="1"></div>
+      <div class="field"><label>进攻方机枪车上限</label><input id="aMG" type="number" min="0" max="10" value="1"></div>
+      <div class="field"><label>防守方机枪车上限（规则固定为0）</label><input type="number" value="0" disabled></div>
+    </div>
+
+    <div style="margin-top:15px"><button class="btn primary" style="width:100%" onclick="createRoom()">创建房间</button></div>
+    <div class="sep"></div>
+    <div class="field"><label>加入已有房间</label><input id="joinCode" maxlength="5" placeholder="输入5位房间号，例如 A1B2C"></div>
+    <div style="margin-top:8px"><button class="btn" style="width:100%" onclick="joinRoom()">加入房间</button></div>
+    <div id="connMsg" class="hint" style="margin-top:10px">正在连接服务器……</div>
+  </div>
+</div>
+
+<div id="result" class="result hidden">
+  <div class="card result-box">
+    <div id="resultTitle" class="result-title"></div>
+    <div id="resultDetail" class="result-detail"></div>
+    <button class="btn primary" style="width:100%" onclick="location.reload()">重新连接</button>
+  </div>
+</div>
+
+
+<div id="gameModal" class="game-modal hidden"><div class="game-modal-card"><div id="gameModalTitle" class="game-modal-title">提示</div><div id="gameModalText" class="game-modal-text"></div><button class="btn primary" onclick="closeGameModal()">确定</button></div></div>
+
+
+<div class="app">
+  <header class="topbar">
+    <div><div class="title">HOMG0 自走棋战棋 · 局域网版</div><div class="subtitle">服务器权威判定 · 实时同步 · 行动状态可视化</div></div>
+    <div class="pills"><span id="rolePill" class="pill">未进入房间</span><span id="turnPill" class="pill">等待</span></div>
+  </header>
+
+  <div class="main">
+    <div class="board-area"><div id="turnStartOverlay" class="turn-start-overlay"><div class="turn-start-card"><div class="turn-start-label">回合开始</div><div id="turnStartName" class="turn-start-name">进攻方</div></div></div><div class="board"><div id="chatOverlay" class="hidden"><div id="chatTop" class="chat-top"></div><div id="chatBottom" class="chat-bottom"></div></div><div id="fxLayer" class="fx-layer"></div><div class="grid">
+      <div id="r1" class="row r1"></div><div id="r2" class="row r2"></div><div id="r3" class="row r3"></div>
+      <div id="r4" class="row r4"></div><div id="r5" class="row r5"></div><div id="r6" class="row r6"></div>
+    </div></div></div>
+
+    <aside class="side">
+      <div class="panel"><div class="pt">联机状态</div><div id="roomText" class="hint">尚未加入房间。</div><div id="configText" class="config-summary"></div></div>
+
+      <div class="panel"><div class="pt">游戏状态</div><div class="grid2"><div class="stat"><div class="sl">回合</div><div id="round" class="sv">-</div></div><div class="stat"><div class="sl">进攻增援</div><div id="reinforce" class="sv">-</div></div></div></div>
+
+      <div class="panel"><div class="pt">部署</div><div id="deployHint" class="hint">进入房间后可操作。</div><div class="unit-buttons">
+        <button id="bInf" onclick="chooseDeploy('infantry')">步兵</button>
+        <button id="bAT" onclick="chooseDeploy('antiTank')">反坦克炮</button>
+        <button id="bMG" onclick="chooseDeploy('machineGun')">机枪车</button>
+      </div></div>
+
+      <div class="panel"><div class="pt">操作</div><div class="rowbtn">
+        <button id="endTurnBtn" class="btn primary" onclick="endTurn()">结束回合</button>
+        <button class="btn" onclick="cancelSelection()">取消选择</button>
+      </div></div>
+
+      <div class="panel"><div class="pt">聊天</div><div class="chat-dock"><input id="chatInput" maxlength="200" placeholder="输入聊天内容，Enter 发送"><button id="chatSend" onclick="sendChat()">发送</button></div></div>
+
+      <div class="panel"><div class="log-head"><div class="pt" style="margin-bottom:0">战斗日志</div><button id="logToggle" class="log-toggle-icon" onclick="toggleLog()" aria-label="折叠战斗日志"><span id="logArrow">▶</span></button></div><div id="log" class="log collapsed"></div></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+let ws = null;
+let state = null;
+let role = null;
+let roomCode = null;
+let hostRole = 'attacker';
+let deployType = null;
+let lastChatText = '';
+let selectedId = null;
+let lastAnimatedEvent = 0;
+let logCollapsed = true;
+let previousTurnPlayer = null;
+let previousStarted = false;
+let activeFxEvent = null;
+let activeFxTimer = null;
+let activeCorpse = null;
+let activeCorpseTimer = null;
+
+const TYPE = {
+  infantry: {name:'步兵', short:'步', range:2},
+  antiTank: {name:'反坦克炮', short:'炮', range:3},
+  machineGun: {name:'机枪车', short:'机', range:2}
+};
+
+function serverUrl(){ return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`; }
+
+function connect(){
+  ws = new WebSocket(serverUrl());
+  ws.onopen = () => document.getElementById('connMsg').textContent = '已连接服务器。';
+  ws.onerror = () => document.getElementById('connMsg').textContent = '连接失败，请确认房主电脑正在运行服务器。';
+  ws.onclose = () => document.getElementById('connMsg').textContent = '与服务器断开连接。';
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if(m.type === 'error'){ showGameModal(m.message, '提示'); return; }
+    if(m.type === 'chat'){ showChatText(m.role===role?'mine':'enemy', m.text); return; }
+    if(m.type === 'created' || m.type === 'joined'){
+      roomCode = m.code; role = m.role;
+      document.getElementById('login').classList.add('hidden');
+    }
+    if(m.type === 'state'){
+      state = m.state;
+      role = state.you;
+      if(selectedId != null && !state.units.some(u=>u.id===selectedId)) selectedId = null;
+      render();
+    }
+  };
+}
+
+function send(type, data={}){
+  if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type,...data}));
+}
+
+function selectHostRole(r){
+  hostRole = r;
+  document.getElementById('roleA').classList.toggle('active',r==='attacker');
+  document.getElementById('roleD').classList.toggle('active',r==='defender');
+}
+
+function val(id){return Number(document.getElementById(id).value);}
+
+function createRoom(){
+  send('create',{hostRole,config:{
+    reinforcement:val('reinforcement'),
+    attackerInfantry:val('aInf'),attackerAntiTank:val('aAT'),attackerMachineGun:val('aMG'),
+    defenderInfantry:val('dInf'),defenderAntiTank:val('dAT'),
+    allowDeployAfterAction:document.getElementById('allowDeployAfterAction').checked
+  }});
+}
+
+function joinRoom(){
+  const code = document.getElementById('joinCode').value.trim().toUpperCase();
+  if(!/^[A-Z0-9]{5}$/.test(code)){ showGameModal('请输入5位房间号', '提示'); return; }
+  send('join',{code});
+}
+
+function chooseDeploy(t){
+  if(!state || state.currentPlayer!==role) return;
+  deployType = deployType===t ? null : t;
+  selectedId = null;
+  render();
+}
+
+function cancelSelection(){selectedId=null;deployType=null;render();}
+function showGameModal(text,title='提示'){document.getElementById('gameModalTitle').textContent=title;document.getElementById('gameModalText').textContent=text;document.getElementById('gameModal').classList.remove('hidden');}
+function closeGameModal(){document.getElementById('gameModal').classList.add('hidden');}
+function showChatText(kind,text){
+  const box=document.getElementById(kind==='mine'?'chatBottom':'chatTop');
+  const line=document.createElement('div');
+  line.className='chat-line '+kind;
+  line.textContent=text;
+  box.appendChild(line);
+  setTimeout(()=>{if(line.parentNode) line.parentNode.removeChild(line);},2050);
+}
+function sendChat(){
+  const input=document.getElementById('chatInput');
+  let text=input.value.trim();
+  if(!state || !state.started || state.state!=='playing' || !role) return;
+  if(!text) text=lastChatText;
+  if(!text) return;
+  lastChatText=text;
+  send('chat',{text});
+  input.value='';
+  input.focus();
+}
+function getUnit(id){return state?.units.find(u=>u.id===id) || null;}
+function myUnit(id){return state?.myUnits.find(u=>u.id===id) || null;}
+function unitAt(r,c){return state?.units.find(u=>u.row===r&&u.col===c) || null;}
+function terrain(r,c){if(r===2&&(c===1||c===3))return 1;if(r===3&&[0,1,3,4].includes(c))return 2;return 0;}
+function dispCol(r,c){return r===5?(c+0.5).toFixed(1):String(c+1);}
+
+function statusBadge(text,kind){return `<span class="badge ${kind||''}">${text}</span>`;}
+
+function statusHtml(u){
+  const moveText = u.type==='machineGun' ? `移${u.moveSteps||0}/2` : (u.moved?'已移':'未移');
+  const shotText = u.shot ? '已攻' : '未攻';
+  const hitText = u.hits>0 ? `受击${u.hits}` : '未受击';
+  let s = '';
+  s += statusBadge(moveText,u.moved?'yes':'no');
+  s += statusBadge(shotText,u.shot?'yes':'no');
+  s += statusBadge(hitText,u.hits>0?'hit':'no');
+  if(u.deployedRound===state.round) s += statusBadge('新部署','fresh');
+  if(!u.canAct) s += statusBadge('结束','no');
+  return s;
+}
+
+function cellCenter(row,col){
+  const el=document.querySelector(`.cell[data-r="${row}"][data-c="${col}"]`);
+  if(!el) return null;
+  const rr=el.getBoundingClientRect();
+  const br=document.querySelector('.board').getBoundingClientRect();
+  return {x:rr.left+rr.width/2-br.left,y:rr.top+rr.height/2-br.top};
+}
+
+function clearFxLayer(){
+  const layer=document.getElementById('fxLayer');
+  if(layer) layer.innerHTML='';
+}
+
+function renderTransientFx(){
+  const board=document.querySelector('.board');
+  const layer=document.getElementById('fxLayer');
+  if(!board||!layer){return;}
+  layer.innerHTML='';
+  if(activeFxEvent && activeFxEvent.at && activeFxEvent.type && activeFxEvent.from){
+    const targetPos=activeFxEvent.targetPos || activeFxEvent.to;
+    const arrowType=activeFxEvent.type==='move'?'move':(['shoot','hit','kill'].includes(activeFxEvent.type)?'attack':null);
+    if(arrowType && targetPos){
+      const from=cellCenter(activeFxEvent.from.row,activeFxEvent.from.col);
+      const to=cellCenter(targetPos.row,targetPos.col);
+      if(from&&to){
+        const dx=to.x-from.x, dy=to.y-from.y;
+        const len=Math.hypot(dx,dy);
+        const angle=Math.atan2(dy,dx);
+        const arrow=document.createElement('div');
+        arrow.className=arrowType==='move'?'move-arrow':'attack-arrow';
+        arrow.style.left=`${from.x}px`;
+        arrow.style.top=`${from.y}px`;
+        arrow.style.width=`${Math.max(18,len-16)}px`;
+        arrow.style.setProperty('--angle',`${angle}rad`);
+        layer.appendChild(arrow);
+      }
+    }
+  }
+  if(activeCorpse){
+    const pos=cellCenter(activeCorpse.row,activeCorpse.col);
+    if(pos){
+      const corpse=document.createElement('div');
+      corpse.className='corpse';
+      corpse.style.left=`${pos.x}px`;
+      corpse.style.top=`${pos.y+18}px`;
+      const label=document.createElement('div');
+      label.className='corpse-label';
+      label.textContent=activeCorpse.label||'尸体';
+      corpse.appendChild(label);
+      layer.appendChild(corpse);
+    }
+  }
+}
+
+function startTransientEvent(ev){
+  if(!ev || !ev.at) return;
+  if(ev.at<=lastAnimatedEvent) return;
+  lastAnimatedEvent=ev.at;
+  activeFxEvent=null;
+  activeCorpse=null;
+  if(activeFxTimer) clearTimeout(activeFxTimer);
+  if(activeCorpseTimer) clearTimeout(activeCorpseTimer);
+
+  const targetPos=ev.targetPos || ev.to;
+  if(['move','shoot','hit','kill'].includes(ev.type) && ev.from && targetPos){
+    activeFxEvent={...ev,targetPos};
+    renderTransientFx();
+    activeFxTimer=setTimeout(()=>{
+      activeFxEvent=null;
+      renderTransientFx();
+    },1000);
+  }
+
+  if(ev.type==='kill' && ev.targetPos){
+    const du=ev.deadUnit;
+    activeCorpse={
+      row:ev.targetPos.row,
+      col:ev.targetPos.col,
+      label:du ? `${du.player==='attacker'?'进攻':'防守'}·${TYPE[du.type].name} #${du.id}` : '尸体'
+    };
+    renderTransientFx();
+    activeCorpseTimer=setTimeout(()=>{
+      activeCorpse=null;
+      renderTransientFx();
+    },1000);
+  }
+}
+
+function createCell(r,c){
+  const el=document.createElement('div');
+  const t=terrain(r,c);
+  el.className='cell'+(t===1?' fort':'')+(t===2?' stairs':'');
+  el.dataset.r=r;el.dataset.c=c;el.onclick=()=>clickCell(r,c);
+  const tn=document.createElement('div');tn.className='terrain';tn.textContent=t===1?'堡垒':t===2?'楼梯':'普通';el.appendChild(tn);
+  const co=document.createElement('div');co.className='coord';co.textContent=`(${r},${dispCol(r,c)})`;el.appendChild(co);
+  if(t){const s=document.createElement('div');s.className='symbol';s.textContent=t===1?'▦':'⇧';el.appendChild(s);}
+  const ev=activeFxEvent || state.lastEvent;
+  const u=unitAt(r,c);
+  if(u){
+    const ue=document.createElement('div');
+    ue.className='unit '+(u.player==='attacker'?'a':'d');
+    if(u.id===selectedId) ue.classList.add('sel');
+    if(u.deployedRound===state.round) ue.classList.add('new');
+    const ev=activeFxEvent;
+    if(ev){
+      if(ev.type==='move'&&ev.unitId===u.id) ue.classList.add('anim-move');
+      if(ev.type==='shoot'&&ev.attackerId===u.id) ue.classList.add('anim-shot');
+      if((ev.type==='hit'||ev.type==='kill')&&ev.targetId===u.id) ue.classList.add('anim-hit');
+      if(ev.type==='deploy'&&ev.unitId===u.id) ue.classList.add('anim-deploy');
+    }
+    ue.textContent=TYPE[u.type].short;
+    const mini=document.createElement('div');mini.className='mini';
+    mini.innerHTML=statusBadge(u.moved?'✓':'·',u.moved?'yes':'no')+statusBadge(u.shot?'★':'·',u.shot?'yes':'no')+(u.hits>0?statusBadge(String(u.hits),'hit'):'');
+    ue.appendChild(mini);el.appendChild(ue);
+  }
+  return el;
+}
+
+function renderBoard(){
+  for(let r=1;r<=6;r++){
+    const box=document.getElementById('r'+r);box.innerHTML='';
+    const cols=r===5?[1,2,3,4]:[0,1,2,3,4];
+    cols.forEach(c=>box.appendChild(createCell(r,c)));
+  }
+
+  const u=myUnit(selectedId);
+  if(!u || u.player!==role || state.currentPlayer!==role){ renderTransientFx(); return; }
+  const legalMoves=new Map((u.legalMoves||[]).map(x=>[`${x.row},${x.col}`,x]));
+  const legalShots=new Set(u.legalShots||[]);
+  document.querySelectorAll('.cell').forEach(e=>{
+    const r=Number(e.dataset.r),c=Number(e.dataset.c),t=unitAt(r,c),k=`${r},${c}`;
+    if(legalMoves.has(k)) e.classList.add('move');
+    if(t && legalShots.has(t.id)) e.classList.add('shoot');
+  });
+
+  if(deployType){
+    const targetRow=role==='attacker'?6:1;
+    document.querySelectorAll(`.cell[data-r="${targetRow}"]`).forEach(e=>{
+      const r=Number(e.dataset.r),c=Number(e.dataset.c);
+      if(!unitAt(r,c)) e.classList.add('deployable');
+    });
+  }
+  renderTransientFx();
+}
+
+function clickCell(r,c){
+  if(!state || state.state!=='playing' || state.currentPlayer!==role) return;
+  const t=unitAt(r,c);
+  if(deployType){ send('deploy',{unitType:deployType,row:r,col:c}); return; }
+  const sel=myUnit(selectedId);
+  if(sel){
+    if(t && t.player!==role && (sel.legalShots||[]).includes(t.id)){ send('shoot',{unitId:sel.id,targetId:t.id}); return; }
+    if(!t && (sel.legalMoves||[]).some(x=>x.row===r&&x.col===c)){ send('move',{unitId:sel.id,row:r,col:c}); return; }
+    if(t && t.player===role){selectedId=t.id;render();return;}
+  }
+  if(t && t.player===role){selectedId=t.id;render();}
+}
+
+function endTurn(){selectedId=null;deployType=null;send('endTurn');render();}
+function toggleLog(){logCollapsed=!logCollapsed;document.getElementById('log').classList.toggle('collapsed',logCollapsed);document.getElementById('logArrow').textContent=logCollapsed?'▶':'▼';}
+
+function configSummary(){
+  const c=state.config;return `规则：增援 ${c.reinforcement} · 进攻 步${c.attackerMax.infantry}/炮${c.attackerMax.antiTank}/机${c.attackerMax.machineGun} · 防守 步${c.defenderMax.infantry}/炮${c.defenderMax.antiTank} · 行动后部署：${c.allowDeployAfterAction?'允许':'禁止'}`;
+}
+
+function render(){
+  if(!state)return;
+  document.getElementById('chatOverlay').classList.toggle('hidden', !state.started || state.state!=='playing');
+  const turnChanged = previousTurnPlayer !== null && previousTurnPlayer !== state.currentPlayer;
+  const firstPlayableTurn = !previousStarted && state.started && state.state === 'playing';
+  if((turnChanged || firstPlayableTurn) && state.started && state.state === 'playing'){
+    showTurnStart(state.currentPlayer);
+    selectedId=null;
+    deployType=null;
+  }
+  previousTurnPlayer = state.currentPlayer;
+  previousStarted = !!state.started;
+  document.getElementById('rolePill').textContent=role==='attacker'?'你是进攻方':'你是防守方';
+  document.getElementById('rolePill').className='pill '+(role==='attacker'?'mine':'enemy');
+  document.getElementById('turnPill').textContent=`当前：${state.currentPlayer==='attacker'?'进攻方':'防守方'}`;
+  document.getElementById('turnPill').className='pill '+(state.currentPlayer===role?'good':'');
+  document.getElementById('round').textContent=state.round;
+  document.getElementById('reinforce').textContent=state.attackerReinforcement;
+  document.getElementById('roomText').innerHTML=roomCode?`房间号：<strong>${roomCode}</strong> · ${state.roomPlayerCount}/2 · 你是${role==='attacker'?'进攻方':'防守方'}${!state.started?' · 等待另一名玩家加入':''}`:'尚未加入房间。';
+  document.getElementById('configText').textContent=state.config?configSummary():'';
+  document.getElementById('deployHint').textContent=state.currentPlayer!==role?'等待对方回合。':`可部署在第${role==='attacker'?6:1}行；${role==='attacker'?`剩余增援 ${state.attackerReinforcement}`:'不消耗增援'}；行动后部署${state.config.allowDeployAfterAction?'已开启':'未开启'}。`;
+  const canOperate=state.started&&state.state==='playing'&&state.currentPlayer===role;
+  document.getElementById('endTurnBtn').disabled=!canOperate;
+
+  document.querySelectorAll('.unit-buttons button').forEach(b=>b.disabled=!canOperate);
+  if(role==='defender') document.getElementById('bMG').disabled=true;
+  if(role==='attacker' && state.attackerReinforcement<=0) document.querySelectorAll('.unit-buttons button').forEach(b=>b.disabled=true);
+  document.querySelectorAll('.unit-buttons button').forEach(b=>b.classList.remove('active'));
+  if(deployType) document.getElementById(deployType==='infantry'?'bInf':deployType==='antiTank'?'bAT':'bMG').classList.add('active');
+
+  document.getElementById('log').innerHTML=(state.log||[]).map(x=>`<div>${escapeHtml(x)}</div>`).join('');
+  document.getElementById('log').scrollTop=999999;
+
+  if(state.lastEvent && state.lastEvent.at>lastAnimatedEvent) startTransientEvent(state.lastEvent);
+  renderBoard();
+
+  if(state.state==='ended'){
+    document.getElementById('resultTitle').textContent=state.winner===role?'你获胜了':'你失败了';
+    document.getElementById('resultDetail').textContent=state.winner==='attacker'?'进攻方获胜。':'防守方获胜。';
+    document.getElementById('result').classList.remove('hidden');
+  }
+}
+
+function showTurnStart(player){
+  const overlay=document.getElementById('turnStartOverlay');
+  const name=document.getElementById('turnStartName');
+  if(!overlay||!name)return;
+  name.textContent=player==='attacker'?'进攻方':'防守方';
+  overlay.classList.remove('show');
+  void overlay.offsetWidth;
+  overlay.classList.add('show');
+  setTimeout(()=>overlay.classList.remove('show'),1000);
+}
+
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+connect();
+</script>
+</body>
+</html>

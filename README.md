@@ -1,42 +1,28 @@
 # HOMG0 局域网联机 Demo
 
-## Windows 启动
+端口：37788
 
-1. 解压整个 `homg0_lan` 文件夹，不要只运行 bat 文件。
-2. 安装 Node.js 18 或更新版本，并确保安装了 npm。
-3. 双击 `start.bat`。
-4. 程序会打开一个标题为 `HOMG0 LAN Server` 的黑色窗口，并保持窗口不关闭。
-5. 第一次启动若没有 `node_modules/ws`，脚本会自动执行 `npm install`。
+## 可选音效
 
-房主电脑浏览器打开：
+音效目录位于 `public/audio/`。没有对应文件则不播放；同一目录有多个支持格式的文件时随机选择。
 
-`http://localhost:37788`
+支持：`.mp3` `.wav` `.ogg` `.m4a` `.aac` `.webm` `.flac`
 
-局域网另一台电脑打开：
-
-`http://房主电脑的局域网IP:37788`
-
-例如：
-
-`http://192.168.1.23:37788`
-
-## 如果启动失败
-
-优先双击 `check_environment.bat`，它会检查 Node.js、npm 和 ws 依赖。
-
-如果 `npm install` 失败，建议在此文件夹中手动打开命令提示符并执行：
-
-```bat
-npm install
-node server.js
+```text
+public/audio/
+├── bgm/                         # 背景音乐，可放多个文件
+├── move/
+│   ├── infantry/                # 步兵移动
+│   ├── anti-tank/               # 反坦克炮移动
+│   └── machine-gun/             # 机枪车移动
+├── attack/
+│   ├── infantry/                # 步兵攻击
+│   ├── anti-tank/               # 反坦克炮攻击
+│   └── machine-gun/             # 机枪车攻击
+└── death/
+    ├── infantry/                # 步兵死亡
+    ├── anti-tank/               # 反坦克炮死亡
+    └── machine-gun/             # 机枪车死亡
 ```
 
-这样错误不会被窗口关闭带走。
-
-## Windows 防火墙
-
-如果房主自己的 `http://localhost:37788` 可以打开，但另一台电脑访问不了 `http://房主IP:37788`，通常需要允许 Node.js / 端口 37788 通过 Windows 专用网络防火墙。
-
-## 停止服务器
-
-服务器窗口中按 `Ctrl+C`。
+浏览器通常禁止未经过用户操作的自动播放，因此背景音乐会在玩家第一次点击、触摸或按键后开始。

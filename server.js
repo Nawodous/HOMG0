@@ -6,6 +6,21 @@ const WebSocket = require('ws');
 const PORT = process.env.PORT || 37788;
 const HOST = '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.webm', '.flac']);
+const AUDIO_ROOT = path.join(PUBLIC_DIR, 'audio');
+
+function collectAudioFiles(dir, prefix = '') {
+  if (!fs.existsSync(dir)) return [];
+  let out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) out = out.concat(collectAudioFiles(full, rel));
+    else if (AUDIO_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) out.push(`/audio/${rel.split(path.sep).join('/')}`);
+  }
+  return out;
+}
+
 
 const DEFAULT_CONFIG = {
   reinforcement: 28,
@@ -300,7 +315,7 @@ function move(g, player, id, row, col) {
   u.moveSteps += target.distance;
 
   addLog(g, `${player === 'attacker' ? '进攻方' : '防守方'}${TYPES[u.type].name}#${u.id}移动到(${row},${displayCol(row, col)})。`);
-  setEvent(g, { type: 'move', unitId: u.id, from, to: { row, col }, distance: target.distance });
+  setEvent(g, { type: 'move', unitId: u.id, unitType: u.type, from, to: { row, col }, distance: target.distance });
 
   if (player === 'attacker' && row === 1) { checkEnd(g); return; }
   finishAction(g, u);
@@ -319,7 +334,7 @@ function shoot(g, player, id, targetId) {
 
   if (immune(t, a)) {
     addLog(g, `${TYPES[a.type].name}#${a.id}射击${TYPES[t.type].name}#${t.id}，未造成伤害。`);
-    setEvent(g, { type: 'shoot', attackerId: a.id, targetId: t.id, result: 'immune', from: { row: a.row, col: a.col }, targetPos: { row: t.row, col: t.col } });
+    setEvent(g, { type: 'shoot', attackerId: a.id, attackerType: a.type, targetId: t.id, targetType: t.type, result: 'immune', from: { row: a.row, col: a.col }, targetPos: { row: t.row, col: t.col } });
     finishAction(g, a);
     return;
   }
@@ -328,7 +343,7 @@ function shoot(g, player, id, targetId) {
     addLog(g, `${TYPES[a.type].name}#${a.id}击毁${TYPES[t.type].name}#${t.id}。`);
     const deadUnit = { ...t };
     g.units = g.units.filter(x => x.id !== t.id);
-    setEvent(g, { type: 'kill', attackerId: a.id, targetId: t.id, reason: 'antiTank', from: { row: a.row, col: a.col }, targetPos: { row: t.row, col: t.col }, deadUnit });
+    setEvent(g, { type: 'kill', attackerId: a.id, attackerType: a.type, targetId: t.id, targetType: t.type, reason: 'antiTank', from: { row: a.row, col: a.col }, targetPos: { row: t.row, col: t.col }, deadUnit });
     finishAction(g, a);
     checkEnd(g);
     return;
@@ -340,9 +355,9 @@ function shoot(g, player, id, targetId) {
     const deadUnit = { ...t };
     g.units = g.units.filter(x => x.id !== t.id);
     addLog(g, `${TYPES[t.type].name}#${t.id}被击杀。`);
-    setEvent(g, { type: 'kill', attackerId: a.id, targetId: t.id, reason: 'twoHits', from: { row: a.row, col: a.col }, targetPos: { row: t.row, col: t.col }, deadUnit });
+    setEvent(g, { type: 'kill', attackerId: a.id, attackerType: a.type, targetId: t.id, targetType: t.type, reason: 'twoHits', from: { row: a.row, col: a.col }, targetPos: { row: t.row, col: t.col }, deadUnit });
   } else {
-    setEvent(g, { type: 'hit', attackerId: a.id, targetId: t.id, hits: t.hits, from: { row: a.row, col: a.col }, targetPos: { row: t.row, col: t.col } });
+    setEvent(g, { type: 'hit', attackerId: a.id, attackerType: a.type, targetId: t.id, targetType: t.type, hits: t.hits, from: { row: a.row, col: a.col }, targetPos: { row: t.row, col: t.col } });
   }
   finishAction(g, a);
   checkEnd(g);
@@ -447,13 +462,32 @@ function sanitizeConfig(raw = {}) {
 
 const httpServer = http.createServer((req, res) => {
   let p = req.url.split('?')[0];
+
+  if (p === '/__audio_manifest') {
+    const manifest = { files: collectAudioFiles(AUDIO_ROOT) };
+    res.writeHead(200, { 'Content-Type': 'application/json;charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify(manifest));
+  }
+
   if (p === '/') p = '/index.html';
   const file = path.join(PUBLIC_DIR, p);
   if (!file.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end('Forbidden'); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not Found'); }
-    const types = { '.html': 'text/html;charset=utf-8', '.js': 'text/javascript;charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml' };
-    res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
+    const types = {
+      '.html': 'text/html;charset=utf-8',
+      '.js': 'text/javascript;charset=utf-8',
+      '.css': 'text/css',
+      '.svg': 'image/svg+xml',
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
+      '.ogg': 'audio/ogg',
+      '.m4a': 'audio/mp4',
+      '.aac': 'audio/aac',
+      '.webm': 'audio/webm',
+      '.flac': 'audio/flac'
+    };
+    res.writeHead(200, { 'Content-Type': types[path.extname(file).toLowerCase()] || 'application/octet-stream' });
     res.end(data);
   });
 });

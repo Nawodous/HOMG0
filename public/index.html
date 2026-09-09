@@ -214,6 +214,9 @@ let activeFxTimer = null;
 let activeCorpse = null;
 let activeCorpseTimer = null;
 
+/* 可选音效系统：服务器扫描 public/audio/，没有对应文件就不播放。 */
+const AUDIO = { manifest: null, bgm: null, bgmUnlocked: false, lastEventAt: 0, lastBgmSrc: null };
+
 const TYPE = {
   infantry: {name:'步兵', short:'步', range:2},
   antiTank: {name:'反坦克炮', short:'炮', range:3},
@@ -221,6 +224,34 @@ const TYPE = {
 };
 
 function serverUrl(){ return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`; }
+
+function pathAudioList(prefix){
+  return (AUDIO.manifest?.files || []).filter(p => p.startsWith(prefix + '/'));
+}
+function randomItem(arr){ return arr.length ? arr[Math.floor(Math.random()*arr.length)] : null; }
+async function loadAudioManifest(){
+  try { const r=await fetch('/__audio_manifest',{cache:'no-store'}); if(!r.ok)return; AUDIO.manifest=await r.json(); startBackgroundMusic(); } catch(_) { AUDIO.manifest={files:[]}; }
+}
+function playAudioFile(src,{loop=false,volume=1}={}){
+  if(!src)return null; const a=new Audio(src); a.preload='auto'; a.loop=loop; a.volume=volume; const p=a.play(); if(p&&p.catch)p.catch(()=>{}); return a;
+}
+function startBackgroundMusic(){
+  if(!AUDIO.bgmUnlocked||!AUDIO.manifest)return; const list=pathAudioList('/audio/bgm'); if(!list.length)return;
+  if(AUDIO.bgm&&!AUDIO.bgm.paused)return; let src=randomItem(list);
+  if(list.length>1&&src===AUDIO.lastBgmSrc)src=randomItem(list.filter(x=>x!==src)); AUDIO.lastBgmSrc=src;
+  AUDIO.bgm=playAudioFile(src,{volume:0.22});
+  if(AUDIO.bgm)AUDIO.bgm.addEventListener('ended',()=>{AUDIO.bgm=null;startBackgroundMusic();},{once:true});
+}
+function unlockAudio(){ if(!AUDIO.bgmUnlocked){AUDIO.bgmUnlocked=true;startBackgroundMusic();} }
+function playUnitSound(kind,type){ const src=randomItem(pathAudioList(`/audio/${kind}/${type}`)); if(src)playAudioFile(src,{volume:0.75}); }
+function playEventSound(ev){
+  if(!ev||!ev.at||ev.at<=AUDIO.lastEventAt)return; AUDIO.lastEventAt=ev.at;
+  if(ev.type==='move'){ if(ev.unitType)playUnitSound('move',ev.unitType); return; }
+  if(ev.type==='shoot'||ev.type==='hit'||ev.type==='kill'){
+    if(ev.attackerType)playUnitSound('attack',ev.attackerType);
+    if(ev.type==='kill'&&ev.deadUnit?.type)playUnitSound('death',ev.deadUnit.type);
+  }
+}
 
 function connect(){
   ws = new WebSocket(serverUrl());
@@ -652,6 +683,8 @@ function render(){
   // This is important for mobile because the board itself may be scaled.
   renderBoard();
   if(state.lastEvent && state.lastEvent.at>lastAnimatedEvent) startTransientEvent(state.lastEvent);
+  if(state.lastEvent) playEventSound(state.lastEvent);
+  startBackgroundMusic();
 
   if(state.state==='ended'){
     document.getElementById('resultTitle').textContent=state.winner===role?'你获胜了':'你失败了';
@@ -674,6 +707,9 @@ function showTurnStart(player){
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+window.addEventListener('pointerdown',unlockAudio,{passive:true});
+window.addEventListener('keydown',unlockAudio);
+loadAudioManifest();
 
 /* 手机端棋盘自适应：只改变显示缩放，不改变坐标和游戏逻辑。 */
 function updateMobileLayout(){

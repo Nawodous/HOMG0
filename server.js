@@ -10,15 +10,28 @@ const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.webm
 const AUDIO_ROOT = path.join(PUBLIC_DIR, 'audio');
 
 function collectAudioFiles(dir, prefix = '') {
-  if (!fs.existsSync(dir)) return [];
-  let out = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (err) {
+    if (err.code === 'ENOENT') return [];
+    console.error(`[AUDIO] Cannot read directory: ${dir}`, err);
+    return [];
+  }
+
+  const out = [];
+  for (const entry of entries) {
     const full = path.join(dir, entry.name);
     const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) out = out.concat(collectAudioFiles(full, rel));
-    else if (AUDIO_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) out.push(`/audio/${rel.split(path.sep).join('/')}`);
+    if (entry.isDirectory()) {
+      out.push(...collectAudioFiles(full, rel));
+    } else if (entry.isFile() && AUDIO_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
+      // URL 编码每一段，兼容空格、中文等 Linux/Windows 都合法的文件名。
+      const urlPath = rel.split('/').map(encodeURIComponent).join('/');
+      out.push(`/audio/${urlPath}`);
+    }
   }
-  return out;
+  return out.sort();
 }
 
 
@@ -464,16 +477,40 @@ const httpServer = http.createServer((req, res) => {
   let p = req.url.split('?')[0];
 
   if (p === '/__audio_manifest') {
-    const manifest = { files: collectAudioFiles(AUDIO_ROOT) };
-    res.writeHead(200, { 'Content-Type': 'application/json;charset=utf-8', 'Cache-Control': 'no-store' });
-    return res.end(JSON.stringify(manifest));
+    try {
+      const files = collectAudioFiles(AUDIO_ROOT);
+      console.log(`[AUDIO] Manifest requested: ${files.length} file(s) found in ${AUDIO_ROOT}`);
+      const manifest = { files };
+      res.writeHead(200, {
+        'Content-Type': 'application/json;charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate'
+      });
+      return res.end(JSON.stringify(manifest));
+    } catch (err) {
+      console.error('[AUDIO] Failed to build manifest:', err);
+      res.writeHead(500, { 'Content-Type': 'application/json;charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(JSON.stringify({ files: [], error: 'audio_manifest_failed' }));
+    }
+  }
+
+  try {
+    p = decodeURIComponent(p);
+  } catch (_) {
+    res.writeHead(400);
+    return res.end('Bad Request');
   }
 
   if (p === '/') p = '/index.html';
   const file = path.join(PUBLIC_DIR, p);
   if (!file.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end('Forbidden'); }
   fs.readFile(file, (err, data) => {
-    if (err) { res.writeHead(404); return res.end('Not Found'); }
+    if (err) {
+      if (path.extname(file).toLowerCase() in Object.fromEntries([...AUDIO_EXTENSIONS].map(ext => [ext, true]))) {
+        console.error(`[AUDIO] Failed to serve ${file}:`, err.code || err.message);
+      }
+      res.writeHead(err.code === 'EACCES' ? 403 : 404);
+      return res.end(err.code === 'EACCES' ? 'Forbidden' : 'Not Found');
+    }
     const types = {
       '.html': 'text/html;charset=utf-8',
       '.js': 'text/javascript;charset=utf-8',

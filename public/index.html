@@ -215,7 +215,108 @@ let activeCorpse = null;
 let activeCorpseTimer = null;
 
 /* 可选音效系统：服务器扫描 public/audio/，没有对应文件就不播放。 */
-const AUDIO = { manifest: null, bgm: null, bgmUnlocked: false, lastEventAt: 0, lastBgmSrc: null };
+const AUDIO = {
+  manifest: null,
+  bgm: null,
+  bgmUnlocked: false,
+  lastEventAt: 0,
+  lastBgmSrc: null,
+  manifestLoaded: false,
+  retryTimer: null
+};
+
+function serverUrl(){ return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`; }
+
+function pathAudioList(prefix){
+  const files = Array.isArray(AUDIO.manifest?.files) ? AUDIO.manifest.files : [];
+  return files.filter(p => p === prefix || p.startsWith(prefix + '/'));
+}
+function randomItem(arr){ return arr.length ? arr[Math.floor(Math.random()*arr.length)] : null; }
+
+async function loadAudioManifest(){
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const r = await fetch('/__audio_manifest?_=' + Date.now(), {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    if (!r.ok) throw new Error(`audio manifest HTTP ${r.status}`);
+    const data = await r.json();
+    AUDIO.manifest = Array.isArray(data.files) ? data : { files: [] };
+    AUDIO.manifestLoaded = true;
+    console.info(`[AUDIO] Loaded ${AUDIO.manifest.files.length} audio file(s).`);
+    startBackgroundMusic();
+  } catch (err) {
+    AUDIO.manifest = { files: [] };
+    console.warn('[AUDIO] Failed to load /__audio_manifest:', err);
+    // 不把错误静默成永久“无音效”；稍后允许重新尝试。
+    clearTimeout(AUDIO.retryTimer);
+    AUDIO.retryTimer = setTimeout(loadAudioManifest, 5000);
+  }
+}
+
+function playAudioFile(src,{loop=false,volume=1}={}){
+  if(!src) return null;
+  const a = new Audio();
+  a.preload = 'auto';
+  a.loop = loop;
+  a.volume = volume;
+  a.src = new URL(src, location.href).href;
+  a.addEventListener('error', () => {
+    console.warn('[AUDIO] Failed to load/play:', a.src, a.error?.code || a.error || 'unknown error');
+  }, {once:true});
+  const p = a.play();
+  if(p && p.catch){
+    p.catch(err => console.debug('[AUDIO] play() rejected:', err?.name || err));
+  }
+  return a;
+}
+
+function startBackgroundMusic(){
+  if(!AUDIO.bgmUnlocked || !AUDIO.manifestLoaded) return;
+  const list = pathAudioList('/audio/bgm');
+  if(!list.length) return;
+  if(AUDIO.bgm && !AUDIO.bgm.paused) return;
+
+  let candidates = list.filter(x => x !== AUDIO.lastBgmSrc);
+  if(!candidates.length) candidates = list;
+  const src = randomItem(candidates);
+  AUDIO.lastBgmSrc = src;
+
+  AUDIO.bgm = playAudioFile(src,{volume:0.22});
+  if(AUDIO.bgm){
+    AUDIO.bgm.addEventListener('ended',()=>{
+      AUDIO.bgm = null;
+      startBackgroundMusic();
+    },{once:true});
+  }
+}
+
+function unlockAudio(){
+  AUDIO.bgmUnlocked = true;
+  startBackgroundMusic();
+}
+
+function playUnitSound(kind,type){
+  const src = randomItem(pathAudioList(`/audio/${kind}/${type}`));
+  if(src) playAudioFile(src,{volume:0.75});
+}
+
+function playEventSound(ev){
+  if(!ev || !ev.at || ev.at <= AUDIO.lastEventAt) return;
+  AUDIO.lastEventAt = ev.at;
+  if(ev.type === 'move'){
+    if(ev.unitType) playUnitSound('move',ev.unitType);
+    return;
+  }
+  if(ev.type === 'shoot' || ev.type === 'hit' || ev.type === 'kill'){
+    if(ev.attackerType) playUnitSound('attack',ev.attackerType);
+    if(ev.type === 'kill' && ev.deadUnit?.type) playUnitSound('death',ev.deadUnit.type);
+  }
+}
 
 const TYPE = {
   infantry: {name:'步兵', short:'步', range:2},
@@ -708,7 +809,9 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':
 
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
 window.addEventListener('pointerdown',unlockAudio,{passive:true});
+window.addEventListener('touchstart',unlockAudio,{passive:true});
 window.addEventListener('keydown',unlockAudio);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') startBackgroundMusic(); });
 loadAudioManifest();
 
 /* 手机端棋盘自适应：只改变显示缩放，不改变坐标和游戏逻辑。 */

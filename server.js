@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 37788;
 const HOST = '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.webm', '.flac']);
-const AUDIO_ROOT = path.join(PUBLIC_DIR, 'audio');
+const AUDIO_ROOT = path.resolve(PUBLIC_DIR, 'audio');
 
 function collectAudioFiles(dir, prefix = '') {
   let entries;
@@ -501,31 +501,77 @@ const httpServer = http.createServer((req, res) => {
   }
 
   if (p === '/') p = '/index.html';
-  const file = path.join(PUBLIC_DIR, p);
-  if (!file.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end('Forbidden'); }
-  fs.readFile(file, (err, data) => {
-    if (err) {
-      if (path.extname(file).toLowerCase() in Object.fromEntries([...AUDIO_EXTENSIONS].map(ext => [ext, true]))) {
-        console.error(`[AUDIO] Failed to serve ${file}:`, err.code || err.message);
-      }
-      res.writeHead(err.code === 'EACCES' ? 403 : 404);
-      return res.end(err.code === 'EACCES' ? 'Forbidden' : 'Not Found');
+
+  // 使用 path.resolve + path.sep 做目录边界判断，避免 Windows/Linux 路径差异与目录穿越问题。
+  const relativePath = p.replace(/^[/\\]+/, '');
+  const file = path.resolve(PUBLIC_DIR, relativePath);
+  const publicRoot = path.resolve(PUBLIC_DIR);
+  if (file !== publicRoot && !file.startsWith(publicRoot + path.sep)) {
+    res.writeHead(403);
+    return res.end('Forbidden');
+  }
+
+  const ext = path.extname(file).toLowerCase();
+  const types = {
+    '.html': 'text/html;charset=utf-8',
+    '.js': 'text/javascript;charset=utf-8',
+    '.css': 'text/css',
+    '.svg': 'image/svg+xml',
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.ogg': 'audio/ogg',
+    '.m4a': 'audio/mp4',
+    '.aac': 'audio/aac',
+    '.webm': 'audio/webm',
+    '.flac': 'audio/flac'
+  };
+
+  fs.stat(file, (statErr, stat) => {
+    if (statErr) {
+      if (AUDIO_EXTENSIONS.has(ext)) console.error(`[AUDIO] Failed to stat ${file}:`, statErr.code || statErr.message);
+      res.writeHead(statErr.code === 'EACCES' ? 403 : 404);
+      return res.end(statErr.code === 'EACCES' ? 'Forbidden' : 'Not Found');
     }
-    const types = {
-      '.html': 'text/html;charset=utf-8',
-      '.js': 'text/javascript;charset=utf-8',
-      '.css': 'text/css',
-      '.svg': 'image/svg+xml',
-      '.mp3': 'audio/mpeg',
-      '.wav': 'audio/wav',
-      '.ogg': 'audio/ogg',
-      '.m4a': 'audio/mp4',
-      '.aac': 'audio/aac',
-      '.webm': 'audio/webm',
-      '.flac': 'audio/flac'
+    if (!stat.isFile()) {
+      res.writeHead(404);
+      return res.end('Not Found');
+    }
+
+    const commonHeaders = {
+      'Content-Type': types[ext] || 'application/octet-stream',
+      'Cache-Control': ext.startsWith('.mp') || AUDIO_EXTENSIONS.has(ext) ? 'no-cache' : 'public, max-age=3600',
+      'Accept-Ranges': AUDIO_EXTENSIONS.has(ext) ? 'bytes' : 'none'
     };
-    res.writeHead(200, { 'Content-Type': types[path.extname(file).toLowerCase()] || 'application/octet-stream' });
-    res.end(data);
+
+    // 音频支持 HTTP Range，兼容 Safari/Chrome 以及 Linux 服务器前的反向代理。
+    if (AUDIO_EXTENSIONS.has(ext) && req.headers.range) {
+      const match = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
+      if (match) {
+        let start = match[1] === '' ? 0 : Number(match[1]);
+        let end = match[2] === '' ? stat.size - 1 : Number(match[2]);
+        if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end >= start && start < stat.size) {
+          end = Math.min(end, stat.size - 1);
+          const chunkSize = end - start + 1;
+          res.writeHead(206, {
+            ...commonHeaders,
+            'Content-Length': chunkSize,
+            'Content-Range': `bytes ${start}-${end}/${stat.size}`
+          });
+          if (req.method === 'HEAD') return res.end();
+          return fs.createReadStream(file, { start, end })
+            .on('error', err => console.error(`[AUDIO] Stream error ${file}:`, err.code || err.message))
+            .pipe(res);
+        }
+      }
+      res.writeHead(416, { ...commonHeaders, 'Content-Range': `bytes */${stat.size}` });
+      return res.end();
+    }
+
+    res.writeHead(200, { ...commonHeaders, 'Content-Length': stat.size });
+    if (req.method === 'HEAD') return res.end();
+    fs.createReadStream(file)
+      .on('error', err => console.error(`[STATIC] Failed to stream ${file}:`, err.code || err.message))
+      .pipe(res);
   });
 });
 

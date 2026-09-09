@@ -21,6 +21,7 @@ const TYPES = {
 };
 
 const rooms = new Map();
+let nextRoomNumber = 1;
 
 function key(r, c) { return `${r},${c}`; }
 function unique(arr) {
@@ -393,8 +394,26 @@ function publicState(g, you) {
     players: { attacker: !!g.players.attacker, defender: !!g.players.defender },
     you,
     roomPlayerCount: (g.players.attacker ? 1 : 0) + (g.players.defender ? 1 : 0),
+    roomName: g.roomName || null,
     lastEvent: g.lastEvent
   };
+}
+
+function lobbySnapshot() {
+  return Array.from(rooms.values())
+    .filter(room => !room.game.started && room.game.state === 'waiting')
+    .map(room => ({
+      id: room.id,
+      name: room.name,
+      hostRole: room.hostRole,
+      playerCount: (room.players.attacker ? 1 : 0) + (room.players.defender ? 1 : 0),
+      config: room.game.config
+    }));
+}
+
+function broadcastLobby() {
+  const data = { type: 'lobby', rooms: lobbySnapshot() };
+  for (const client of wss.clients) send(client, data);
 }
 
 function send(ws, obj) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj)); }
@@ -433,7 +452,7 @@ const httpServer = http.createServer((req, res) => {
   if (!file.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end('Forbidden'); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not Found'); }
-    const types = { '.html': 'text/html;charset=utf-8', '.js': 'text/javascript;charset=utf-8', '.css': 'text/css' };
+    const types = { '.html': 'text/html;charset=utf-8', '.js': 'text/javascript;charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml' };
     res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
     res.end(data);
   });
@@ -442,7 +461,7 @@ const httpServer = http.createServer((req, res) => {
 const wss = new WebSocket.Server({ server: httpServer });
 
 wss.on('connection', ws => {
-  ws.roomCode = null;
+  ws.roomId = null;
   ws.role = null;
   send(ws, { type: 'hello', message: 'connected' });
 
@@ -450,34 +469,47 @@ wss.on('connection', ws => {
     try {
       const m = JSON.parse(raw.toString());
 
+      if (m.type === 'listRooms') {
+        send(ws, { type: 'lobby', rooms: lobbySnapshot() });
+        return;
+      }
+
       if (m.type === 'create') {
-        let code;
-        do code = Math.random().toString(36).slice(2, 7).toUpperCase(); while (rooms.has(code));
         const hostRole = m.hostRole === 'defender' ? 'defender' : 'attacker';
         const config = sanitizeConfig(m.config);
         const g = newGame(config, hostRole);
-        const room = { code, game: g, players: { attacker: null, defender: null } };
+        const id = `room-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const room = {
+          id,
+          name: `房间 ${nextRoomNumber++}`,
+          hostRole,
+          game: g,
+          players: { attacker: null, defender: null }
+        };
+        g.roomName = room.name;
         room.players[hostRole] = ws;
         g.players[hostRole] = ws;
-        rooms.set(code, room);
-        ws.roomCode = code;
+        rooms.set(id, room);
+        ws.roomId = id;
         ws.role = hostRole;
-        send(ws, { type: 'created', code, role: hostRole });
+        send(ws, { type: 'created', id: room.id, name: room.name, role: hostRole });
         broadcast(room);
+        broadcastLobby();
         return;
       }
 
       if (m.type === 'join') {
-        const code = String(m.code || '').trim().toUpperCase();
-        const room = rooms.get(code);
-        if (!room) throw new Error('房间不存在');
+        const id = String(m.roomId || '');
+        const room = rooms.get(id);
+        if (!room) throw new Error('房间不存在或已经开始');
+        if (room.game.started || room.game.state !== 'waiting') throw new Error('该房间已经开始');
         const joinRole = room.players.attacker ? 'defender' : 'attacker';
         if (room.players[joinRole]) throw new Error('房间已满');
         room.players[joinRole] = ws;
         room.game.players[joinRole] = ws;
-        ws.roomCode = room.code;
+        ws.roomId = room.id;
         ws.role = joinRole;
-        send(ws, { type: 'joined', code: room.code, role: joinRole });
+        send(ws, { type: 'joined', id: room.id, name: room.name, role: joinRole });
         if (room.players.attacker && room.players.defender && !room.game.started) {
           room.game.started = true;
           room.game.state = 'playing';
@@ -485,10 +517,11 @@ wss.on('connection', ws => {
           addLog(room.game, `两名玩家已连接。${room.game.currentPlayer === 'attacker' ? '进攻方' : '防守方'}先手。`);
         }
         broadcast(room);
+        broadcastLobby();
         return;
       }
 
-      const room = rooms.get(ws.roomCode);
+      const room = rooms.get(ws.roomId);
       if (!room) throw new Error('尚未加入房间');
       const player = ws.role;
       const g = room.game;
@@ -519,7 +552,7 @@ wss.on('connection', ws => {
   });
 
   ws.on('close', () => {
-    const room = rooms.get(ws.roomCode);
+    const room = rooms.get(ws.roomId);
     if (!room) return;
     if (room.game.state !== 'ended' && room.game.started) {
       room.game.state = 'ended';
@@ -528,7 +561,13 @@ wss.on('connection', ws => {
       setEvent(room.game, { type: 'disconnectWin', winner: room.game.winner });
     }
     broadcast(room);
-    setTimeout(() => { if (rooms.get(room.code) === room) rooms.delete(room.code); }, 60000);
+    setTimeout(() => {
+      if (rooms.get(room.id) === room) {
+        rooms.delete(room.id);
+        broadcastLobby();
+      }
+    }, 60000);
+    broadcastLobby();
   });
 });
 

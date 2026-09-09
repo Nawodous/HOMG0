@@ -17,7 +17,7 @@ button{cursor:pointer}
 .app{min-height:100vh}
 .topbar{height:72px;padding:0 22px;display:flex;align-items:center;justify-content:space-between;background:#151b23;border-bottom:1px solid #2a3442}
 .title{font-size:21px;font-weight:800}.subtitle{font-size:12px;color:var(--muted);margin-top:4px}
-.pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pill{padding:7px 12px;border-radius:999px;background:#293445;font-size:12px}.pill.mine{background:#495d92}.pill.enemy{background:#75424d}.pill.good{background:#2d6a50}
+.top-actions{display:flex;align-items:center;gap:8px}.settings-btn{width:36px;height:36px;border:1px solid #3a485b;border-radius:9px;background:#222c39;color:#e5edf6;font-size:18px;cursor:pointer}.settings-btn:hover{background:#2c3848}.pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pill{padding:7px 12px;border-radius:999px;background:#293445;font-size:12px}.pill.mine{background:#495d92}.pill.enemy{background:#75424d}.pill.good{background:#2d6a50}
 .main{display:grid;grid-template-columns:minmax(720px,1fr) 420px;min-height:calc(100vh - 72px)}
 .board-area{position:relative;padding:20px;display:flex;justify-content:center;align-items:flex-start;overflow:auto}
 .board{position:relative;width:790px;height:720px;min-width:790px}.fx-layer{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visible}.fx-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}.fx-arrow{transform-box:fill-box;transform-origin:center;animation:fxArrowIn 1s ease-out forwards}.fx-arrow.move{stroke:#58a6ff;fill:#58a6ff;filter:drop-shadow(0 0 7px #58a6ff)}.fx-arrow.attack{stroke:#f2cb68;fill:#f2cb68;filter:drop-shadow(0 0 5px #f2cb68)}.corpse{position:absolute;width:54px;height:36px;border-radius:50%;border:2px solid #4e5965;background:radial-gradient(ellipse at center,#555f68 0%,#303740 60%,#20262c 100%);box-shadow:0 4px 10px #000a;transform:translate(-50%,-50%) rotate(-18deg);animation:corpseFade 1s ease-out forwards;z-index:19}.corpse::after{content:'☠';position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);font-size:20px;color:#9aa4ae;text-shadow:0 1px 3px #000}.corpse .corpse-label{position:absolute;left:50%;top:100%;transform:translate(-50%,4px);font-size:9px;color:#7f8993;white-space:nowrap}.grid{position:absolute;inset:48px 38px 24px}
@@ -41,12 +41,12 @@ button{cursor:pointer}
 .side{background:#121820;border-left:1px solid #2a3442;padding:14px;display:flex;flex-direction:column;gap:11px;overflow:auto}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.pt{font-size:13px;font-weight:800;margin-bottom:10px}.hint{font-size:12px;line-height:1.6;color:#aeb9c7}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px}.stat{background:#121820;border-radius:8px;padding:8px}.sl{font-size:10px;color:#7f8da0}.sv{margin-top:3px;font-size:13px;font-weight:800}
 .config-summary{font-size:11px;line-height:1.7;color:#aeb8c6}.unit-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.unit-buttons button{border:0;border-radius:8px;padding:9px 4px;background:#2c3747;color:#e1e7ef}.unit-buttons button.active{background:#5d5d9d}.unit-buttons button:disabled{opacity:.35;cursor:not-allowed}
-.selection{min-height:80px;font-size:12px;line-height:1.7;color:#bdc7d4}.rowbtn{display:grid;grid-template-columns:1fr 1fr;gap:7px}.btn{border:0;border-radius:8px;padding:10px;background:#303c4c;color:#fff}.btn.primary{background:#5969a6}.btn.danger{background:#873f49}.btn:disabled{opacity:.35;cursor:not-allowed}
+.selection{min-height:80px;font-size:12px;line-height:1.7;color:#bdc7d4}.rowbtn{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}.btn{border:0;border-radius:8px;padding:10px;background:#303c4c;color:#fff}.btn.primary{background:#5969a6}.btn.danger{background:#873f49}.btn:disabled{opacity:.35;cursor:not-allowed}
 .unit-list{display:flex;flex-direction:column;gap:6px;max-height:290px;overflow:auto}.my-units-body.collapsed{display:none}.collapsible-head{width:100%;display:flex;align-items:center;justify-content:space-between;border:0;background:transparent;color:inherit;padding:0;text-align:left}.collapsible-head .chev{color:#8f9bad;font-size:12px}.urow{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;background:#121820;border-radius:8px;padding:7px}.uicon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}.uicon.a{background:#863b47}.uicon.d{background:#376789}.uinfo{font-size:11px}.uname{font-size:12px;font-weight:700}.subline{color:#8492a4;margin-top:2px}.ustate{display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end;max-width:155px}.log{height:180px;overflow:auto;background:#10161d;border-radius:8px;padding:8px;font-size:10px;line-height:1.65;color:#aab5c3}.log.collapsed{display:none}.log-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.log-toggle-icon{width:26px;height:26px;padding:0;border:0;border-radius:7px;background:#222c39;color:#dfe7f1;display:flex;align-items:center;justify-content:center}.log-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;border:0;border-radius:8px;padding:8px 10px;background:#222c39;color:#dfe7f1;font-size:12px}.log-toggle span{color:#8f9bad}.turn-start-overlay{position:fixed;top:72px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(4,8,13,.34);pointer-events:none;opacity:0;z-index:90}
 .game-modal{position:fixed;top:72px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(4,8,13,.48);z-index:120}.game-modal.hidden{display:none}.game-modal-card{width:min(420px,88vw);padding:22px;border:1px solid #4d5d76;border-radius:14px;background:#1b2430;box-shadow:0 22px 70px #000b;text-align:center}.game-modal-title{font-size:18px;font-weight:900}.game-modal-text{margin:10px 0 18px;color:#aeb9c7;font-size:12px;line-height:1.7}.game-modal-card .btn{min-width:120px}
 .chat-top,.chat-bottom{position:absolute;z-index:110;pointer-events:none;width:min(430px,42%);display:flex;flex-direction:column;gap:4px;font-size:22px;line-height:1.35}.chat-top{left:20px;top:20px;align-items:flex-start}.chat-bottom{right:20px;bottom:20px;align-items:flex-end}.chat-line{color:#eef3f9;text-shadow:0 2px 6px #000;opacity:0;animation:chatTextIn .15s ease-out forwards,chatTextOut .45s ease-in 1.55s forwards}.chat-line.mine{color:#dce8ff}.chat-line.enemy{color:#ffe1e4}.chat-dock{display:flex;gap:7px;padding:0}.chat-dock input{flex:1;min-width:0;border:1px solid #3c4a5e;border-radius:8px;padding:9px 11px;background:#0e141b;color:#fff;outline:none}.chat-dock button{border:0;border-radius:8px;padding:9px 15px;background:#5969a6;color:#fff}.chat-dock button:disabled{opacity:.4;cursor:not-allowed}@keyframes chatTextIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}@keyframes chatTextOut{to{opacity:0;transform:translateY(-4px)}}
 .turn-start-overlay.show{animation:turnStartOverlay 1s ease-out forwards}.turn-start-card{min-width:280px;padding:22px 34px;border:1px solid #64769a;border-radius:16px;background:rgba(25,33,45,.94);box-shadow:0 18px 55px #0008;text-align:center}.turn-start-label{font-size:13px;color:#99a7ba;letter-spacing:3px}.turn-start-name{margin-top:6px;font-size:30px;font-weight:900;text-shadow:0 0 18px rgba(255,255,255,.16)}@keyframes turnStartOverlay{0%{opacity:0}15%{opacity:1}75%{opacity:1}100%{opacity:0}}
-.login,.result{position:fixed;top:72px;left:0;right:0;bottom:0;background:#081018ee;display:flex;align-items:center;justify-content:center;z-index:100}.card{width:min(560px,94vw);max-height:92vh;overflow:auto;background:#1b232e;border:1px solid #3a485c;border-radius:16px;padding:22px;box-shadow:0 25px 70px #0009}.card h1{margin:0;font-size:24px}.card p{font-size:12px;line-height:1.75;color:#aab5c4}.sep{height:1px;background:#2d3745;margin:16px 0}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;color:#99a6b7}.field input,.field select{padding:10px;border-radius:8px;border:1px solid #3c4a5f;background:#10161e;color:#fff}.section-title{font-size:12px;font-weight:800;margin:15px 0 8px}.role-choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}.role-card{padding:11px;border:1px solid #39475a;border-radius:9px;background:#141a22;cursor:pointer}.role-card.active{border-color:#7084bd;background:#29334b}.role-card strong{display:block;font-size:13px}.role-card span{font-size:10px;color:#8f9bad}.codebox{margin-top:12px;border:1px dashed #5d7196;border-radius:10px;padding:10px;text-align:center;background:#172134}.room-code{font-size:24px;font-weight:900;letter-spacing:5px;color:#f2cb68}.room-list{display:flex;flex-direction:column;gap:8px;max-height:45vh;overflow:auto}.room-item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px;border:1px solid #39475a;border-radius:10px;background:#141a22}.room-info strong{display:block;font-size:13px}.room-meta{margin-top:3px;font-size:10px;color:#8f9bad;line-height:1.5}.room-item .btn{padding:8px 12px;min-width:76px}.result-box{text-align:center}.result-title{font-size:28px;font-weight:900}.result-detail{margin:16px 0;color:#b7c1cf;line-height:1.7}
+.login,.result{position:fixed;top:72px;left:0;right:0;bottom:0;background:#081018ee;display:flex;align-items:center;justify-content:center;z-index:100}.card{width:min(560px,94vw);max-height:92vh;overflow:auto;background:#1b232e;border:1px solid #3a485c;border-radius:16px;padding:22px;box-shadow:0 25px 70px #0009}.card h1{margin:0;font-size:24px}.card p{font-size:12px;line-height:1.75;color:#aab5c4}.sep{height:1px;background:#2d3745;margin:16px 0}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;color:#99a6b7}.field input,.field select{padding:10px;border-radius:8px;border:1px solid #3c4a5f;background:#10161e;color:#fff}.section-title{font-size:12px;font-weight:800;margin:15px 0 8px}.role-choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}.role-card{padding:11px;border:1px solid #39475a;border-radius:9px;background:#141a22;cursor:pointer}.role-card.active{border-color:#7084bd;background:#29334b}.role-card strong{display:block;font-size:13px}.role-card span{font-size:10px;color:#8f9bad}.codebox{margin-top:12px;border:1px dashed #5d7196;border-radius:10px;padding:10px;text-align:center;background:#172134}.room-code{font-size:24px;font-weight:900;letter-spacing:5px;color:#f2cb68}.room-list{display:flex;flex-direction:column;gap:8px;max-height:45vh;overflow:auto}.room-item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px;border:1px solid #39475a;border-radius:10px;background:#141a22}.room-info strong{display:block;font-size:13px}.room-meta{margin-top:3px;font-size:10px;color:#8f9bad;line-height:1.5}.room-item .btn{padding:8px 12px;min-width:76px}.settings-box{width:min(460px,92vw)}.setting-row{margin:14px 0}.setting-row label{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#c5cfdb}.setting-row input[type=range]{width:100%;margin-top:8px}.upload-row{display:flex;gap:8px;align-items:center}.upload-row input[type=file]{flex:1;min-width:0;font-size:11px;color:#aab5c4}.settings-note{font-size:10px;color:#8190a3;line-height:1.6;margin-top:8px}.result-box{text-align:center}.result-title{font-size:28px;font-weight:900}.result-detail{margin:16px 0;color:#b7c1cf;line-height:1.7}
 @media(max-width:1180px){.main{grid-template-columns:1fr}.side{border-left:0;border-top:1px solid #2a3442}.board-area{justify-content:flex-start}}
 
 /* 手机端响应式：桌面端样式保持不变 */
@@ -70,7 +70,7 @@ button{cursor:pointer}
   .stat{padding:7px}
   .sv{font-size:12px}
   .unit-buttons button,.btn{min-height:42px;padding:10px 6px}
-  .rowbtn{gap:6px}
+  .rowbtn{grid-template-columns:1fr 1fr 1fr;gap:6px}
   .chat-dock{gap:6px}
   .chat-dock input{font-size:16px;min-height:42px;padding:9px 10px}
   .chat-dock button{min-height:42px;padding:9px 13px}
@@ -158,11 +158,13 @@ button{cursor:pointer}
 
 <div id="gameModal" class="game-modal hidden"><div class="game-modal-card"><div id="gameModalTitle" class="game-modal-title">提示</div><div id="gameModalText" class="game-modal-text"></div><button class="btn primary" onclick="closeGameModal()">确定</button></div></div>
 
+<div id="settingsModal" class="game-modal hidden"><div class="game-modal-card settings-box"><div class="game-modal-title">设置</div><div class="setting-row"><label>背景音乐音量 <span id="bgmVolumeValue">100%</span></label><input id="bgmVolume" type="range" min="0" max="100" value="100" oninput="setVolumeFromUI()"></div><div class="setting-row"><label>音效音量 <span id="sfxVolumeValue">100%</span></label><input id="sfxVolume" type="range" min="0" max="100" value="100" oninput="setVolumeFromUI()"></div><div class="setting-row"><label>自定义 BGM</label><div class="upload-row"><input id="customBgmInput" type="file" accept=".mp3,audio/mpeg" onchange="useCustomBgm(event)"><button class="btn" onclick="restoreBuiltInBgm()">恢复内置</button></div><div id="customBgmName" class="settings-note">未选择自定义音乐。</div><div class="settings-note">自定义 MP3 仅在当前浏览器本地播放，不会上传到服务器。</div></div><button class="btn primary" style="width:100%;margin-top:6px" onclick="closeSettings()">关闭</button></div></div>
+
 
 <div class="app">
   <header class="topbar">
     <div><div class="title">HOMG0 自走棋战棋 · 局域网版</div><div class="subtitle">服务器权威判定 · 实时同步 · 行动状态可视化</div></div>
-    <div class="pills"><span id="rolePill" class="pill">未进入房间</span><span id="turnPill" class="pill">等待</span></div>
+    <div class="top-actions"><div class="pills"><span id="rolePill" class="pill">未进入房间</span><span id="turnPill" class="pill">等待</span></div><button class="settings-btn" onclick="openSettings()" aria-label="设置">⚙</button></div>
   </header>
 
   <div class="main">
@@ -184,7 +186,7 @@ button{cursor:pointer}
 
       <div class="panel"><div class="pt">操作</div><div class="rowbtn">
         <button id="endTurnBtn" class="btn primary" onclick="endTurn()">结束回合</button>
-        <button class="btn" onclick="cancelSelection()">取消选择</button>
+        <button class="btn" onclick="cancelSelection()">取消选择</button><button id="surrenderBtn" class="btn danger" onclick="surrender()">投降</button>
       </div></div>
 
       <div class="panel"><div class="pt">聊天</div><div class="chat-dock"><input id="chatInput" maxlength="200" placeholder="输入聊天内容，Enter 发送"><button id="chatSend" onclick="sendChat()">发送</button></div></div>
@@ -213,6 +215,8 @@ let activeFxEvent = null;
 let activeFxTimer = null;
 let activeCorpse = null;
 let activeCorpseTimer = null;
+let surrenderCount = 0;
+let surrenderTimer = null;
 
 /* 可选音效系统：服务器扫描 public/audio/，没有对应文件就不播放。 */
 const AUDIO = {
@@ -222,7 +226,11 @@ const AUDIO = {
   lastEventAt: 0,
   lastBgmSrc: null,
   manifestLoaded: false,
-  retryTimer: null
+  retryTimer: null,
+  localBgmUrl: null,
+  localBgmName: '',
+  bgmVolume: Number(localStorage.getItem('homg0_bgm_volume') ?? 1),
+  sfxVolume: Number(localStorage.getItem('homg0_sfx_volume') ?? 1)
 };
 
 function serverUrl(){ return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`; }
@@ -264,7 +272,7 @@ function playAudioFile(src,{loop=false,volume=1}={}){
   const a = new Audio();
   a.preload = 'auto';
   a.loop = loop;
-  a.volume = volume;
+  a.volume = Math.max(0, Math.min(1, volume));
   a.src = new URL(src, location.href).href;
   a.addEventListener('error', () => {
     console.warn('[AUDIO] Failed to load/play:', a.src, a.error?.code || a.error || 'unknown error');
@@ -278,6 +286,12 @@ function playAudioFile(src,{loop=false,volume=1}={}){
 
 function startBackgroundMusic(){
   if(!AUDIO.bgmUnlocked || !AUDIO.manifestLoaded) return;
+  if(AUDIO.localBgmUrl){
+    if(AUDIO.bgm && !AUDIO.bgm.paused && AUDIO.bgm.src === new URL(AUDIO.localBgmUrl, location.href).href) return;
+    if(AUDIO.bgm){ AUDIO.bgm.pause(); AUDIO.bgm = null; }
+    AUDIO.bgm = playAudioFile(AUDIO.localBgmUrl,{loop:true,volume:AUDIO.bgmVolume});
+    return;
+  }
   const list = pathAudioList('/audio/bgm');
   if(!list.length) return;
   if(AUDIO.bgm && !AUDIO.bgm.paused) return;
@@ -287,7 +301,7 @@ function startBackgroundMusic(){
   const src = randomItem(candidates);
   AUDIO.lastBgmSrc = src;
 
-  AUDIO.bgm = playAudioFile(src,{volume:0.22});
+  AUDIO.bgm = playAudioFile(src,{volume:AUDIO.bgmVolume});
   if(AUDIO.bgm){
     AUDIO.bgm.addEventListener('ended',()=>{
       AUDIO.bgm = null;
@@ -303,7 +317,7 @@ function unlockAudio(){
 
 function playUnitSound(kind,type){
   const src = randomItem(pathAudioList(`/audio/${kind}/${type}`));
-  if(src) playAudioFile(src,{volume:0.75});
+  if(src) playAudioFile(src,{volume:AUDIO.sfxVolume});
 }
 
 function playEventSound(ev){
@@ -333,6 +347,7 @@ function connect(){
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if(m.type === 'error'){ showGameModal(m.message, '提示'); return; }
+    if(m.type === 'surrenderProgress'){ updateSurrenderProgress(m.count, m.remainingMs); return; }
     if(m.type === 'chat'){ showChatText(m.role===role?'mine':'enemy', m.text); return; }
     if(m.type === 'lobby'){ lobbyRooms = m.rooms || []; renderLobby(); return; }
     if(m.type === 'created' || m.type === 'joined'){
@@ -386,7 +401,9 @@ function renderLobby(){
   box.innerHTML=lobbyRooms.map(room=>{
     const config=room.config||{};
     const roleText=room.hostRole==='attacker'?'进攻方':'防守方';
-    return `<div class="room-item"><div class="room-info"><strong>${escapeHtml(room.name)}</strong><div class="room-meta">房主：${roleText} · ${room.playerCount}/2<br>增援：${config.reinforcement ?? '-'} · 行动后部署：${config.allowDeployAfterAction?'允许':'禁止'}</div></div><button class="btn primary" onclick="joinRoom('${room.id}')" ${room.playerCount>=2?'disabled':''}>加入</button></div>`;
+    const playing=room.status==='playing';
+    const action=playing?'观战':(room.playerCount>=2?'观战':'加入');
+    return `<div class="room-item"><div class="room-info"><strong>${escapeHtml(room.name)}</strong><div class="room-meta">房主：${roleText} · ${room.playerCount}/2 · 观战：${room.spectatorCount||0}<br>增援：${config.reinforcement ?? '-'} · 行动后部署：${config.allowDeployAfterAction?'允许':'禁止'}${playing?' · 对战中':''}</div></div><button class="btn primary" onclick="joinRoom('${room.id}')">${action}</button></div>`;
   }).join('');
 }
 
@@ -404,6 +421,57 @@ function createRoom(){
 function joinRoom(id){
   if(!id) return;
   send('join',{roomId:id});
+}
+
+function surrender(){
+  if(!state || !state.started || state.state!=='playing' || (role!=='attacker' && role!=='defender')) return;
+  send('surrender');
+}
+
+function updateSurrenderProgress(count, remainingMs){
+  surrenderCount=count;
+  const btn=document.getElementById('surrenderBtn');
+  if(btn) btn.textContent=`投降 ${count}/3`;
+  clearTimeout(surrenderTimer);
+  surrenderTimer=setTimeout(()=>{ surrenderCount=0; if(btn) btn.textContent='投降'; }, Math.max(0, Math.min(2200, remainingMs || 2000)));
+}
+
+function openSettings(){
+  const modal=document.getElementById('settingsModal');
+  document.getElementById('bgmVolume').value=Math.round(AUDIO.bgmVolume*100);
+  document.getElementById('sfxVolume').value=Math.round(AUDIO.sfxVolume*100);
+  document.getElementById('bgmVolumeValue').textContent=Math.round(AUDIO.bgmVolume*100)+'%';
+  document.getElementById('sfxVolumeValue').textContent=Math.round(AUDIO.sfxVolume*100)+'%';
+  document.getElementById('customBgmName').textContent=AUDIO.localBgmName?`当前：${AUDIO.localBgmName}`:'未选择自定义音乐。';
+  modal.classList.remove('hidden');
+}
+function closeSettings(){document.getElementById('settingsModal').classList.add('hidden');}
+function setVolumeFromUI(){
+  AUDIO.bgmVolume=Math.max(0,Math.min(1,Number(document.getElementById('bgmVolume').value)/100));
+  AUDIO.sfxVolume=Math.max(0,Math.min(1,Number(document.getElementById('sfxVolume').value)/100));
+  localStorage.setItem('homg0_bgm_volume',String(AUDIO.bgmVolume));
+  localStorage.setItem('homg0_sfx_volume',String(AUDIO.sfxVolume));
+  document.getElementById('bgmVolumeValue').textContent=Math.round(AUDIO.bgmVolume*100)+'%';
+  document.getElementById('sfxVolumeValue').textContent=Math.round(AUDIO.sfxVolume*100)+'%';
+  if(AUDIO.bgm) AUDIO.bgm.volume=AUDIO.bgmVolume;
+}
+function useCustomBgm(event){
+  const file=event.target.files?.[0];
+  if(!file) return;
+  if(file.type && file.type!=='audio/mpeg' && !file.name.toLowerCase().endsWith('.mp3')){ showGameModal('请选择 MP3 文件。','设置'); return; }
+  if(AUDIO.localBgmUrl) URL.revokeObjectURL(AUDIO.localBgmUrl);
+  AUDIO.localBgmUrl=URL.createObjectURL(file);
+  AUDIO.localBgmName=file.name;
+  if(AUDIO.bgm){AUDIO.bgm.pause();AUDIO.bgm=null;}
+  startBackgroundMusic();
+  document.getElementById('customBgmName').textContent=`当前：${file.name}`;
+}
+function restoreBuiltInBgm(){
+  if(AUDIO.localBgmUrl) URL.revokeObjectURL(AUDIO.localBgmUrl);
+  AUDIO.localBgmUrl=null; AUDIO.localBgmName='';
+  if(AUDIO.bgm){AUDIO.bgm.pause();AUDIO.bgm=null;}
+  startBackgroundMusic();
+  document.getElementById('customBgmName').textContent='未选择自定义音乐。';
 }
 
 function chooseDeploy(t){
@@ -730,17 +798,18 @@ function render(){
   }
   previousTurnPlayer = state.currentPlayer;
   previousStarted = !!state.started;
-  document.getElementById('rolePill').textContent=role==='attacker'?'你是进攻方':'你是防守方';
-  document.getElementById('rolePill').className='pill '+(role==='attacker'?'mine':'enemy');
+  document.getElementById('rolePill').textContent=role==='attacker'?'你是进攻方':role==='defender'?'你是防守方':'观战中';
+  document.getElementById('rolePill').className='pill '+(role==='attacker'?'mine':role==='defender'?'enemy':'good');
   document.getElementById('turnPill').textContent=`当前：${state.currentPlayer==='attacker'?'进攻方':'防守方'}`;
   document.getElementById('turnPill').className='pill '+(state.currentPlayer===role?'good':'');
   document.getElementById('round').textContent=state.round;
   document.getElementById('reinforce').textContent=state.attackerReinforcement;
-  document.getElementById('roomText').innerHTML=state?.roomName?`<strong>${escapeHtml(state.roomName)}</strong> · ${state.roomPlayerCount}/2 · 你是${role==='attacker'?'进攻方':'防守方'}${!state.started?' · 等待另一名玩家加入':''}`:'尚未加入房间。';
+  document.getElementById('roomText').innerHTML=state?.roomName?`<strong>${escapeHtml(state.roomName)}</strong> · ${state.roomPlayerCount}/2 · ${role==='spectator'?'观战中':`你是${role==='attacker'?'进攻方':'防守方'}`}${!state.started?' · 等待另一名玩家加入':''}`:'尚未加入房间。';
   document.getElementById('configText').textContent=state.config?configSummary():'';
   document.getElementById('deployHint').textContent=state.currentPlayer!==role?'等待对方回合。':`可部署在第${role==='attacker'?6:1}行；${role==='attacker'?`剩余增援 ${state.attackerReinforcement}`:'不消耗增援'}；行动后部署${state.config.allowDeployAfterAction?'已开启':'未开启'}。`;
-  const canOperate=state.started&&state.state==='playing'&&state.currentPlayer===role;
+  const canOperate=state.started&&state.state==='playing'&&(role==='attacker'||role==='defender')&&state.currentPlayer===role;
   document.getElementById('endTurnBtn').disabled=!canOperate;
+  const surrenderBtn=document.getElementById('surrenderBtn'); if(surrenderBtn){ surrenderBtn.disabled=!canOperate; if(!canOperate){surrenderBtn.textContent='投降'; surrenderCount=0;} }
 
   document.querySelectorAll('.unit-buttons button').forEach(b=>b.disabled=!canOperate);
   if(role==='defender') document.getElementById('bMG').disabled=true;
@@ -759,7 +828,7 @@ function render(){
   startBackgroundMusic();
 
   if(state.state==='ended'){
-    document.getElementById('resultTitle').textContent=state.winner===role?'你获胜了':'你失败了';
+    document.getElementById('resultTitle').textContent=role==='spectator'?'对局结束':(state.winner===role?'你获胜了':'你失败了');
     document.getElementById('resultDetail').textContent=state.winner==='attacker'?'进攻方获胜。':'防守方获胜。';
     document.getElementById('result').classList.remove('hidden');
   }

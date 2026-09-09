@@ -138,6 +138,7 @@ function newGame(config, hostRole) {
     log: [],
     config,
     players: { attacker: null, defender: null },
+    spectators: new Set(),
     started: false,
     lastEvent: null,
     lastChat: { attacker: '', defender: '' }
@@ -429,12 +430,14 @@ function publicState(g, you) {
 
 function lobbySnapshot() {
   return Array.from(rooms.values())
-    .filter(room => !room.game.started && room.game.state === 'waiting')
+    .filter(room => room.game.state !== 'ended')
     .map(room => ({
       id: room.id,
       name: room.name,
       hostRole: room.hostRole,
+      status: room.game.started ? 'playing' : 'waiting',
       playerCount: (room.players.attacker ? 1 : 0) + (room.players.defender ? 1 : 0),
+      spectatorCount: room.game.spectators ? room.game.spectators.size : 0,
       config: room.game.config
     }));
 }
@@ -449,6 +452,11 @@ function broadcast(room) {
   for (const role of ['attacker', 'defender']) {
     const p = room.players[role];
     if (p) send(p, { type: 'state', state: publicState(room.game, role) });
+  }
+  if (room.game.spectators) {
+    for (const spectator of room.game.spectators) {
+      send(spectator, { type: 'state', state: publicState(room.game, 'spectator') });
+    }
   }
 }
 
@@ -618,30 +626,77 @@ wss.on('connection', ws => {
       if (m.type === 'join') {
         const id = String(m.roomId || '');
         const room = rooms.get(id);
-        if (!room) throw new Error('房间不存在或已经开始');
-        if (room.game.started || room.game.state !== 'waiting') throw new Error('该房间已经开始');
-        const joinRole = room.players.attacker ? 'defender' : 'attacker';
-        if (room.players[joinRole]) throw new Error('房间已满');
-        room.players[joinRole] = ws;
-        room.game.players[joinRole] = ws;
-        ws.roomId = room.id;
-        ws.role = joinRole;
-        send(ws, { type: 'joined', id: room.id, name: room.name, role: joinRole });
-        if (room.players.attacker && room.players.defender && !room.game.started) {
-          room.game.started = true;
-          room.game.state = 'playing';
-          resetTurnForCurrentPlayer(room.game);
-          addLog(room.game, `两名玩家已连接。${room.game.currentPlayer === 'attacker' ? '进攻方' : '防守方'}先手。`);
+        if (!room) throw new Error('房间不存在或已经结束');
+
+        // 等待中的房间优先加入空缺玩家位；已经开始的房间则进入观战。
+        if (!room.game.started && room.game.state === 'waiting') {
+          const joinRole = room.players.attacker ? 'defender' : 'attacker';
+          if (room.players[joinRole]) throw new Error('房间已满');
+          room.players[joinRole] = ws;
+          room.game.players[joinRole] = ws;
+          ws.roomId = room.id;
+          ws.role = joinRole;
+          ws.spectating = false;
+          ws.surrenderClicks = 0;
+          ws.surrenderWindowStartedAt = 0;
+          send(ws, { type: 'joined', id: room.id, name: room.name, role: joinRole, spectating: false });
+          if (room.players.attacker && room.players.defender && !room.game.started) {
+            room.game.started = true;
+            room.game.state = 'playing';
+            resetTurnForCurrentPlayer(room.game);
+            addLog(room.game, `两名玩家已连接。${room.game.currentPlayer === 'attacker' ? '进攻方' : '防守方'}先手。`);
+          }
+          broadcast(room);
+          broadcastLobby();
+          return;
         }
+
+        // 已开战房间：只读观战连接。
+        if (room.game.started && room.game.state !== 'ended') {
+          room.game.spectators ||= new Set();
+          room.game.spectators.add(ws);
+          ws.roomId = room.id;
+          ws.role = 'spectator';
+          ws.spectating = true;
+          send(ws, { type: 'joined', id: room.id, name: room.name, role: 'spectator', spectating: true });
+          send(ws, { type: 'state', state: publicState(room.game, 'spectator') });
+          broadcastLobby();
+          return;
+        }
+
+        throw new Error('该房间无法加入');
+      }
+      const room = rooms.get(ws.roomId);
+      if (!room) throw new Error('尚未加入房间');
+      const player = ws.role;
+      const g = room.game;
+
+      if (m.type === 'surrender') {
+        if (player !== 'attacker' && player !== 'defender') throw new Error('观战者不能投降');
+        if (g.state !== 'playing') throw new Error('游戏已结束');
+        const now = Date.now();
+        if (!ws.surrenderWindowStartedAt || now - ws.surrenderWindowStartedAt > 2000) {
+          ws.surrenderWindowStartedAt = now;
+          ws.surrenderClicks = 1;
+        } else {
+          ws.surrenderClicks = (ws.surrenderClicks || 0) + 1;
+        }
+        if (ws.surrenderClicks < 3) {
+          send(ws, { type: 'surrenderProgress', count: ws.surrenderClicks, remainingMs: Math.max(0, 2000 - (now - ws.surrenderWindowStartedAt)) });
+          return;
+        }
+        ws.surrenderClicks = 0;
+        ws.surrenderWindowStartedAt = 0;
+        g.state = 'ended';
+        g.winner = player === 'attacker' ? 'defender' : 'attacker';
+        addLog(g, `${player === 'attacker' ? '进攻方' : '防守方'}投降，${g.winner === 'attacker' ? '进攻方' : '防守方'}获胜。`);
+        setEvent(g, { type: 'surrenderWin', winner: g.winner });
         broadcast(room);
         broadcastLobby();
         return;
       }
 
-      const room = rooms.get(ws.roomId);
-      if (!room) throw new Error('尚未加入房间');
-      const player = ws.role;
-      const g = room.game;
+      if (player === 'spectator') throw new Error('观战中不能进行游戏操作');
 
       if (m.type === 'deploy') deploy(g, player, m.unitType, Number(m.row), Number(m.col));
       else if (m.type === 'move') move(g, player, Number(m.unitId), Number(m.row), Number(m.col));
@@ -653,9 +708,13 @@ wss.on('connection', ws => {
         if (!text) text = g.lastChat[player] || '';
         if (!text) throw new Error('还没有可重复发送的上一条消息');
         g.lastChat[player] = text;
+        const chatPacket = { type: 'chat', role: player, text, at: Date.now() };
         for (const r of ['attacker', 'defender']) {
           const peer = room.players[r];
-          if (peer) send(peer, { type: 'chat', role: player, text, at: Date.now() });
+          if (peer) send(peer, chatPacket);
+        }
+        if (room.game.spectators) {
+          for (const spectator of room.game.spectators) send(spectator, chatPacket);
         }
         return;
       }
@@ -671,6 +730,11 @@ wss.on('connection', ws => {
   ws.on('close', () => {
     const room = rooms.get(ws.roomId);
     if (!room) return;
+    if (ws.role === 'spectator') {
+      room.game.spectators?.delete(ws);
+      broadcastLobby();
+      return;
+    }
     if (room.game.state !== 'ended' && room.game.started) {
       room.game.state = 'ended';
       room.game.winner = ws.role === 'attacker' ? 'defender' : 'attacker';

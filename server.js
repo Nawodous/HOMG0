@@ -8,6 +8,8 @@ const HOST = '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.webm', '.flac']);
 const AUDIO_ROOT = path.resolve(PUBLIC_DIR, 'audio');
+const BOT_STEP_DELAY = 550;
+const BOT_MAX_STEPS_PER_TURN = 100;
 
 function collectAudioFiles(dir, prefix = '') {
   let entries;
@@ -141,7 +143,11 @@ function newGame(config, hostRole) {
     spectators: new Set(),
     started: false,
     lastEvent: null,
-    lastChat: { attacker: '', defender: '' }
+    lastChat: { attacker: '', defender: '' },
+    gameMode: 'pvp',
+    botRole: null,
+    botDifficulty: 'normal',
+    winnerReason: null
   };
 }
 
@@ -274,6 +280,7 @@ function checkEnd(g) {
   if (a1) {
     g.state = 'ended';
     g.winner = 'attacker';
+    g.winnerReason = 'attacker_reached_first_row';
     addLog(g, `进攻方 ${TYPES[a1.type].name}#${a1.id} 到达第一行，进攻方胜利。`);
     setEvent(g, { type: 'win', winner: 'attacker', unitId: a1.id });
     return true;
@@ -281,6 +288,7 @@ function checkEnd(g) {
   if (g.attackerReinforcement === 0 && alive(g, 'attacker').length === 0) {
     g.state = 'ended';
     g.winner = 'defender';
+    g.winnerReason = 'attacker_eliminated';
     addLog(g, '进攻方增援耗尽且场上全灭，防守方胜利。');
     setEvent(g, { type: 'win', winner: 'defender' });
     return true;
@@ -417,6 +425,7 @@ function publicState(g, you) {
     myUnits: youUnits,
     state: g.state,
     winner: g.winner,
+    winnerReason: g.winnerReason,
     log: g.log,
     started: g.started,
     config: g.config,
@@ -424,7 +433,10 @@ function publicState(g, you) {
     you,
     roomPlayerCount: (g.players.attacker ? 1 : 0) + (g.players.defender ? 1 : 0),
     roomName: g.roomName || null,
-    lastEvent: g.lastEvent
+    lastEvent: g.lastEvent,
+    gameMode: g.gameMode,
+    botRole: g.botRole,
+    botDifficulty: g.botDifficulty
   };
 }
 
@@ -435,8 +447,10 @@ function lobbySnapshot() {
       id: room.id,
       name: room.name,
       hostRole: room.hostRole,
+      gameMode: room.gameMode,
+      botDifficulty: room.botDifficulty,
       status: room.game.started ? 'playing' : 'waiting',
-      playerCount: (room.players.attacker ? 1 : 0) + (room.players.defender ? 1 : 0),
+      playerCount: (room.game.players.attacker ? 1 : 0) + (room.game.players.defender ? 1 : 0),
       spectatorCount: room.game.spectators ? room.game.spectators.size : 0,
       config: room.game.config
     }));
@@ -479,6 +493,267 @@ function sanitizeConfig(raw = {}) {
     },
     allowDeployAfterAction: raw.allowDeployAfterAction === true
   };
+}
+
+function randomChoice(items) {
+  return items.length ? items[Math.floor(Math.random() * items.length)] : null;
+}
+
+const BOT_PROFILES = {
+  easy: { topChoices: 4, dangerWeight: 0.25, mobilityWeight: 0.5 },
+  normal: { topChoices: 2, dangerWeight: 0.75, mobilityWeight: 1 },
+  hard: { topChoices: 1, dangerWeight: 1.2, mobilityWeight: 1.25 }
+};
+
+function normalizeBotDifficulty(value) {
+  return Object.hasOwn(BOT_PROFILES, value) ? value : 'normal';
+}
+
+function opponentOf(player) {
+  return player === 'attacker' ? 'defender' : 'attacker';
+}
+
+function graphDistance(fromRow, fromCol, toRow, toCol) {
+  if (fromRow === toRow && fromCol === toCol) return 0;
+  return bfs(fromRow, fromCol, 12).get(key(toRow, toCol)) ?? 99;
+}
+
+function unitValue(type) {
+  if (type === 'antiTank') return 85;
+  if (type === 'machineGun') return 70;
+  return 45;
+}
+
+function canDamageAt(attacker, targetType, row, col) {
+  if (targetType === 'machineGun' && (attacker.type === 'infantry' || attacker.type === 'machineGun')) return false;
+  if (terrainAt(row, col) === 1 && (attacker.type === 'infantry' || attacker.type === 'machineGun')) return false;
+  return true;
+}
+
+function shotWouldKill(attacker, target) {
+  if (!canDamageAt(attacker, target.type, target.row, target.col)) return false;
+  if (attacker.type === 'antiTank' && (target.type === 'machineGun' || terrainAt(target.row, target.col) === 1)) return true;
+  return target.hits >= 1;
+}
+
+function chooseRanked(items, difficulty) {
+  if (!items.length) return null;
+  const profile = BOT_PROFILES[normalizeBotDifficulty(difficulty)];
+  const ranked = [...items].sort((a, b) => b.score - a.score);
+  const bestScore = ranked[0].score;
+  const nearBest = ranked.filter(item => item.score >= bestScore - (difficulty === 'easy' ? 80 : 12));
+  return randomChoice(nearBest.slice(0, profile.topChoices));
+}
+
+function botDeployChoices(g, player) {
+  if (player === 'attacker' && g.attackerReinforcement <= 0) return [];
+  const row = player === 'attacker' ? 6 : 1;
+  const emptyCols = [0, 1, 2, 3, 4].filter(col => !unitAt(g, row, col));
+  if (!emptyCols.length) return [];
+
+  const maxima = g.config[player === 'attacker' ? 'attackerMax' : 'defenderMax'];
+  const enemies = alive(g, opponentOf(player));
+  return Object.keys(TYPES).flatMap(type => {
+    if (type === 'machineGun' && player === 'defender') return [];
+    if (countType(g, player, type) >= (maxima[type] ?? 0)) return [];
+    return emptyCols.map(col => {
+      let score = type === 'antiTank' ? 85 : type === 'machineGun' ? 72 : 60;
+      score -= countType(g, player, type) * 9;
+      score += 10 - Math.abs(col - 2) * 4;
+      if (type === 'antiTank' && enemies.some(u => u.type === 'machineGun' || terrainAt(u.row, u.col) === 1)) score += 120;
+      if (type === 'machineGun' && !enemies.some(u => u.type === 'antiTank')) score += 25;
+      if (enemies.length) {
+        const nearestColumn = Math.min(...enemies.map(u => Math.abs((u.row === 5 ? u.col - 0.5 : u.col) - col)));
+        score -= nearestColumn * 3;
+      }
+      return { type, row, col, score };
+    });
+  });
+}
+
+function chooseBotDeployment(g, player, difficulty) {
+  return chooseRanked(botDeployChoices(g, player), difficulty);
+}
+
+function threatAt(g, unit, row, col) {
+  let threat = 0;
+  for (const enemy of alive(g, opponentOf(unit.player))) {
+    if (graphDistance(enemy.row, enemy.col, row, col) > TYPES[enemy.type].range) continue;
+    if (!canDamageAt(enemy, unit.type, row, col)) continue;
+    if (enemy.type === 'antiTank' && (unit.type === 'machineGun' || terrainAt(row, col) === 1)) threat += 190;
+    else threat += unit.hits > 0 ? 85 : 48;
+  }
+  return threat;
+}
+
+function defensiveBlockValue(g, row, col) {
+  if (row !== 1) return 0;
+  let value = 0;
+  for (const attacker of alive(g, 'attacker')) {
+    if (neighbors(attacker.row, attacker.col).some(([r, c]) => r === row && c === col)) value += 800;
+  }
+  return value;
+}
+
+function scoreShot(g, attacker, target) {
+  if (!canDamageAt(attacker, target.type, target.row, target.col)) {
+    return { score: -900, priority: 'none' };
+  }
+
+  const kill = shotWouldKill(attacker, target);
+  let score = 95 + unitValue(target.type);
+  if (target.hits > 0) score += 125;
+  if (kill) score += 560 + unitValue(target.type) * 2;
+  if (target.player === 'attacker') {
+    if (target.row === 2) score += 360;
+    else if (target.row === 3) score += 150;
+  }
+  if (attacker.type === 'antiTank' && (target.type === 'machineGun' || terrainAt(target.row, target.col) === 1)) score += 150;
+  return { score, priority: kill ? 'kill' : 'hit' };
+}
+
+function scoreMove(g, unit, target, difficulty) {
+  const profile = BOT_PROFILES[normalizeBotDifficulty(difficulty)];
+  const enemies = alive(g, opponentOf(unit.player));
+  let score = -target.distance * 2;
+
+  if (unit.player === 'attacker') {
+    if (target.row === 1) return { score: 100000, priority: 'win' };
+    score += (unit.row - target.row) * 62;
+    score += (6 - target.row) * 4;
+    if (terrainAt(target.row, target.col) === 1) score += 38;
+    if (terrainAt(target.row, target.col) === 2) score += 20;
+  } else if (enemies.length) {
+    const before = Math.min(...enemies.map(enemy => graphDistance(unit.row, unit.col, enemy.row, enemy.col)));
+    const after = Math.min(...enemies.map(enemy => graphDistance(target.row, target.col, enemy.row, enemy.col)));
+    score += (before - after) * 34;
+    score += defensiveBlockValue(g, target.row, target.col) - defensiveBlockValue(g, unit.row, unit.col);
+    if (target.row === 2) score += 24;
+  }
+
+  if (!unit.shot) {
+    const bestFutureShot = enemies
+      .filter(enemy => graphDistance(target.row, target.col, enemy.row, enemy.col) <= TYPES[unit.type].range)
+      .map(enemy => scoreShot(g, { ...unit, row: target.row, col: target.col }, enemy).score)
+      .reduce((best, value) => Math.max(best, value), 0);
+    score += bestFutureShot * 0.18;
+  }
+
+  const mobility = neighbors(target.row, target.col)
+    .filter(([r, c]) => !unitAt(g, r, c) && canEnterTerrain(unit, r, c)).length;
+  score += mobility * 3 * profile.mobilityWeight;
+  score -= threatAt(g, unit, target.row, target.col) * profile.dangerWeight;
+  return { score, priority: 'move' };
+}
+
+function botActionChoices(g, player, difficulty) {
+  const actions = [];
+  for (const unit of g.units.filter(u => u.player === player && u.canAct)) {
+    const shots = shootTargets(g, unit);
+    const moves = moveTargets(g, unit);
+
+    for (const target of shots) {
+      const scored = scoreShot(g, unit, target);
+      actions.push({ type: 'shoot', unitId: unit.id, targetId: target.id, ...scored });
+    }
+    for (const target of moves) {
+      const scored = scoreMove(g, unit, target, difficulty);
+      actions.push({ type: 'move', unitId: unit.id, row: target.row, col: target.col, ...scored });
+    }
+
+    const usefulShot = shots.some(target => canDamageAt(unit, target.type, target.row, target.col));
+    const stopScore = usefulShot || moves.length ? -35 : 5;
+    actions.push({ type: 'stop', unitId: unit.id, score: stopScore, priority: 'stop' });
+  }
+  return actions;
+}
+
+function chooseBotAction(g, player, difficulty) {
+  const choices = botActionChoices(g, player, difficulty);
+  const winning = choices.filter(action => action.priority === 'win');
+  if (winning.length) return chooseRanked(winning, 'hard');
+  const kills = choices.filter(action => action.priority === 'kill');
+  if (kills.length) return chooseRanked(kills, difficulty);
+  return chooseRanked(choices, difficulty);
+}
+
+/* The bot scores only the current legal actions and yields between each one. */
+function scheduleBotTurn(room, delay = BOT_STEP_DELAY) {
+  if (!room || !room.botRole || room.game.state !== 'playing') return;
+  if (room.game.currentPlayer !== room.botRole || room.botTimer) return;
+  room.botTimer = setTimeout(() => {
+    room.botTimer = null;
+    runBotStep(room);
+  }, delay);
+}
+
+function runBotStep(room) {
+  if (rooms.get(room.id) !== room) return;
+  const g = room.game;
+  const player = room.botRole;
+  if (!player || g.state !== 'playing' || g.currentPlayer !== player) return;
+
+  try {
+    const turnKey = `${g.round}:${player}`;
+    if (room.botStepTurn !== turnKey) {
+      room.botStepTurn = turnKey;
+      room.botSteps = 0;
+    }
+    room.botSteps++;
+    if (room.botSteps > BOT_MAX_STEPS_PER_TURN) {
+      addLog(g, '机器人达到本回合操作上限，自动结束回合。');
+      endTurn(g, player);
+      broadcast(room);
+      broadcastLobby();
+      return;
+    }
+
+    if (room.botDeployTurn !== turnKey) {
+      // Deployment is repeatable within a turn. Keep taking legal deployment
+      // choices until the row, reinforcement, or per-type caps are exhausted;
+      // only then mark the deployment phase complete and begin unit actions.
+      const choice = chooseBotDeployment(g, player, room.botDifficulty);
+      if (choice) {
+        deploy(g, player, choice.type, choice.row, choice.col);
+        broadcast(room);
+        scheduleBotTurn(room);
+        return;
+      }
+      room.botDeployTurn = turnKey;
+    }
+
+    const activeUnits = g.units.filter(u => u.player === player && u.canAct);
+    if (!activeUnits.length) {
+      endTurn(g, player);
+      broadcast(room);
+      broadcastLobby();
+      return;
+    }
+
+    const action = chooseBotAction(g, player, room.botDifficulty);
+    if (!action) {
+      endTurn(g, player);
+      broadcast(room);
+      return;
+    }
+
+    if (action.type === 'shoot') shoot(g, player, action.unitId, action.targetId);
+    else if (action.type === 'move') move(g, player, action.unitId, action.row, action.col);
+    else endUnit(g, player, action.unitId);
+
+    broadcast(room);
+    if (g.state === 'ended') {
+      broadcastLobby();
+      return;
+    }
+    scheduleBotTurn(room);
+  } catch (err) {
+    console.error(`[BOT] Failed in ${room.id}:`, err);
+    if (g.state === 'playing' && g.currentPlayer === player) {
+      try { endTurn(g, player); } catch (_) { /* leave the room state intact */ }
+      broadcast(room);
+    }
+  }
 }
 
 const httpServer = http.createServer((req, res) => {
@@ -601,6 +876,9 @@ wss.on('connection', ws => {
 
       if (m.type === 'create') {
         const hostRole = m.hostRole === 'defender' ? 'defender' : 'attacker';
+        const gameMode = m.gameMode === 'ai' ? 'ai' : 'pvp';
+        const botRole = gameMode === 'ai' ? (hostRole === 'attacker' ? 'defender' : 'attacker') : null;
+        const botDifficulty = normalizeBotDifficulty(m.botDifficulty);
         const config = sanitizeConfig(m.config);
         const g = newGame(config, hostRole);
         const id = `room-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -608,18 +886,40 @@ wss.on('connection', ws => {
           id,
           name: `房间 ${nextRoomNumber++}`,
           hostRole,
+          gameMode,
+          botRole,
+          botDifficulty,
+          botTimer: null,
+          botDeployTurn: null,
+          botStepTurn: null,
+          botSteps: 0,
           game: g,
           players: { attacker: null, defender: null }
         };
         g.roomName = room.name;
+        g.gameMode = gameMode;
+        g.botRole = botRole;
+        g.botDifficulty = botDifficulty;
         room.players[hostRole] = ws;
         g.players[hostRole] = ws;
+        if (botRole) g.players[botRole] = { bot: true };
         rooms.set(id, room);
         ws.roomId = id;
         ws.role = hostRole;
-        send(ws, { type: 'created', id: room.id, name: room.name, role: hostRole });
+        ws.spectating = false;
+        ws.surrenderClicks = 0;
+        ws.surrenderWindowStartedAt = 0;
+        if (botRole) {
+          g.started = true;
+          g.state = 'playing';
+          resetTurnForCurrentPlayer(g);
+          const difficultyName = { easy: '简单', normal: '普通', hard: '困难' }[botDifficulty];
+          addLog(g, `人机对战开始。${difficultyName}机器人控制${botRole === 'attacker' ? '进攻方' : '防守方'}。`);
+        }
+        send(ws, { type: 'created', id: room.id, name: room.name, role: hostRole, gameMode });
         broadcast(room);
         broadcastLobby();
+        scheduleBotTurn(room);
         return;
       }
 
@@ -689,6 +989,7 @@ wss.on('connection', ws => {
         ws.surrenderWindowStartedAt = 0;
         g.state = 'ended';
         g.winner = player === 'attacker' ? 'defender' : 'attacker';
+        g.winnerReason = 'surrender';
         addLog(g, `${player === 'attacker' ? '进攻方' : '防守方'}投降，${g.winner === 'attacker' ? '进攻方' : '防守方'}获胜。`);
         setEvent(g, { type: 'surrenderWin', winner: g.winner });
         broadcast(room);
@@ -696,7 +997,7 @@ wss.on('connection', ws => {
         return;
       }
 
-      if (player === 'spectator') throw new Error('观战中不能进行游戏操作');
+      if (player === 'spectator' && m.type !== 'leaveRoom') throw new Error('观战中不能进行游戏操作');
 
       if (m.type === 'deploy') deploy(g, player, m.unitType, Number(m.row), Number(m.col));
       else if (m.type === 'move') move(g, player, Number(m.unitId), Number(m.row), Number(m.col));
@@ -719,9 +1020,45 @@ wss.on('connection', ws => {
         return;
       }
       else if (m.type === 'ping') { send(ws, { type: 'pong' }); return; }
+      else if (m.type === 'leaveRoom') {
+        const leavingRole = ws.role;
+        if (leavingRole === 'spectator') {
+          room.game.spectators?.delete(ws);
+          ws.roomId = null;
+          ws.role = null;
+          ws.spectating = false;
+          send(ws, { type: 'leftRoom' });
+          broadcastLobby();
+          return;
+        }
+
+        if (room.game.state === 'playing' && room.game.started) {
+          room.game.state = 'ended';
+          room.game.winner = leavingRole === 'attacker' ? 'defender' : 'attacker';
+          room.game.winnerReason = 'leave_room';
+          addLog(room.game, `${leavingRole === 'attacker' ? '进攻方' : '防守方'}退出房间，另一方获胜。`);
+          setEvent(room.game, { type: 'leaveWin', winner: room.game.winner });
+        }
+
+        room.players[leavingRole] = null;
+        room.game.players[leavingRole] = null;
+        if (room.botTimer) {
+          clearTimeout(room.botTimer);
+          room.botTimer = null;
+        }
+        ws.roomId = null;
+        ws.role = null;
+        ws.spectating = false;
+        send(ws, { type: 'leftRoom' });
+        if (room.game.state === 'ended') broadcast(room);
+        if (!room.game.started) rooms.delete(room.id);
+        broadcastLobby();
+        return;
+      }
       else throw new Error('未知操作');
 
       broadcast(room);
+      scheduleBotTurn(room);
     } catch (e) {
       send(ws, { type: 'error', code: e.code || null, message: e.message || String(e) });
     }
@@ -735,9 +1072,14 @@ wss.on('connection', ws => {
       broadcastLobby();
       return;
     }
+    if (room.botTimer) {
+      clearTimeout(room.botTimer);
+      room.botTimer = null;
+    }
     if (room.game.state !== 'ended' && room.game.started) {
       room.game.state = 'ended';
       room.game.winner = ws.role === 'attacker' ? 'defender' : 'attacker';
+      room.game.winnerReason = 'disconnect';
       addLog(room.game, `${ws.role === 'attacker' ? '进攻方' : '防守方'}断开连接，另一方获胜。`);
       setEvent(room.game, { type: 'disconnectWin', winner: room.game.winner });
     }
@@ -752,7 +1094,20 @@ wss.on('connection', ws => {
   });
 });
 
-httpServer.listen(PORT, HOST, () => {
-  console.log(`HOMG0 LAN server running on http://0.0.0.0:${PORT}`);
-  console.log(`局域网访问: http://<房主IP>:${PORT}`);
-});
+if (require.main === module) {
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`HOMG0 LAN server running on http://0.0.0.0:${PORT}`);
+    console.log(`局域网访问: http://<房主IP>:${PORT}`);
+  });
+}
+
+module.exports = {
+  testing: {
+    DEFAULT_CONFIG,
+    newGame,
+    createUnit,
+    normalizeBotDifficulty,
+    chooseBotDeployment,
+    chooseBotAction
+  }
+};

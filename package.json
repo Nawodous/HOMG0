@@ -4,6 +4,9 @@
   "private": true,
   "description": "HOMG0 自走棋战棋局域网联机 Demo",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
   "dependencies": { "ws": "^8.18.0" }
 }

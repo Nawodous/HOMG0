@@ -19,11 +19,11 @@ button{cursor:pointer}
 .title{font-size:21px;font-weight:800}.subtitle{font-size:12px;color:var(--muted);margin-top:4px}
 .top-actions{display:flex;align-items:center;gap:8px}.settings-btn{width:36px;height:36px;border:1px solid #3a485b;border-radius:9px;background:#222c39;color:#e5edf6;font-size:18px;cursor:pointer}.settings-btn:hover{background:#2c3848}.pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pill{padding:7px 12px;border-radius:999px;background:#293445;font-size:12px}.pill.mine{background:#495d92}.pill.enemy{background:#75424d}.pill.good{background:#2d6a50}
 .main{display:grid;grid-template-columns:minmax(720px,1fr) 420px;min-height:calc(100vh - 72px)}
-.board-area{position:relative;padding:20px;display:flex;justify-content:center;align-items:flex-start;overflow:auto}
+  .board-area{position:relative;padding:20px;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;overflow:auto}
 .board{position:relative;width:790px;height:720px;min-width:790px}.fx-layer{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visible}.fx-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}.fx-arrow{transform-box:fill-box;transform-origin:center;animation:fxArrowIn 1s ease-out forwards}.fx-arrow.move{stroke:#58a6ff;fill:#58a6ff;filter:drop-shadow(0 0 7px #58a6ff)}.fx-arrow.attack{stroke:#f2cb68;fill:#f2cb68;filter:drop-shadow(0 0 5px #f2cb68)}.corpse{position:absolute;width:54px;height:36px;border-radius:50%;border:2px solid #4e5965;background:radial-gradient(ellipse at center,#555f68 0%,#303740 60%,#20262c 100%);box-shadow:0 4px 10px #000a;transform:translate(-50%,-50%) rotate(-18deg);animation:corpseFade 1s ease-out forwards;z-index:19}.corpse::after{content:'☠';position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);font-size:20px;color:#9aa4ae;text-shadow:0 1px 3px #000}.corpse .corpse-label{position:absolute;left:50%;top:100%;transform:translate(-50%,4px);font-size:9px;color:#7f8993;white-space:nowrap}.grid{position:absolute;inset:48px 38px 24px}
 .row{position:absolute;left:0;width:100%;display:flex;justify-content:center;gap:12px}.r1{top:0}.r2{top:108px}.r3{top:216px}.r4{top:324px}.r5{top:432px}.r6{top:540px}
-.cell{position:relative;width:116px;height:90px;border:2px solid #394555;border-radius:13px;background:linear-gradient(145deg,#222a35,#1d242e);cursor:pointer;transition:.16s ease}
-.cell:hover{transform:translateY(-1px);border-color:#6e7e95}.cell.move{box-shadow:inset 0 0 0 3px rgba(89,206,145,.9);background:linear-gradient(145deg,#233b30,#1d2f27)}
+.cell{position:relative;width:116px;height:90px;border:2px solid #394555;border-radius:13px;background:linear-gradient(145deg,#222a35,#1d242e);cursor:pointer;transition:none}
+.cell:hover{transform:none;border-color:#6e7e95}.cell.move{box-shadow:inset 0 0 0 3px rgba(89,206,145,.9);background:linear-gradient(145deg,#233b30,#1d2f27)}
 .cell.shoot{box-shadow:inset 0 0 0 3px rgba(223,113,120,.95);background:linear-gradient(145deg,#45272c,#2f2024)}
 .cell.deployable{box-shadow:inset 0 0 0 3px rgba(101,161,220,.8);background:linear-gradient(145deg,#24354a,#202c3c)}
 .fort{background:linear-gradient(145deg,#4c3924,#362b1d);border-color:#a98042}.stairs{background:linear-gradient(145deg,#30375a,#282f4b);border-color:#777fc2}
@@ -46,7 +46,7 @@ button{cursor:pointer}
 .game-modal{position:fixed;top:72px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(4,8,13,.48);z-index:120}.game-modal.hidden{display:none}.game-modal-card{width:min(420px,88vw);padding:22px;border:1px solid #4d5d76;border-radius:14px;background:#1b2430;box-shadow:0 22px 70px #000b;text-align:center}.game-modal-title{font-size:18px;font-weight:900}.game-modal-text{margin:10px 0 18px;color:#aeb9c7;font-size:12px;line-height:1.7}.game-modal-card .btn{min-width:120px}
 .chat-top,.chat-bottom{position:absolute;z-index:110;pointer-events:none;width:min(430px,42%);display:flex;flex-direction:column;gap:4px;font-size:22px;line-height:1.35}.chat-top{left:20px;top:20px;align-items:flex-start}.chat-bottom{right:20px;bottom:20px;align-items:flex-end}.chat-line{color:#eef3f9;text-shadow:0 2px 6px #000;opacity:0;animation:chatTextIn .15s ease-out forwards,chatTextOut .45s ease-in 1.55s forwards}.chat-line.mine{color:#dce8ff}.chat-line.enemy{color:#ffe1e4}.chat-dock{display:flex;gap:7px;padding:0}.chat-dock input{flex:1;min-width:0;border:1px solid #3c4a5e;border-radius:8px;padding:9px 11px;background:#0e141b;color:#fff;outline:none}.chat-dock button{border:0;border-radius:8px;padding:9px 15px;background:#5969a6;color:#fff}.chat-dock button:disabled{opacity:.4;cursor:not-allowed}@keyframes chatTextIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}@keyframes chatTextOut{to{opacity:0;transform:translateY(-4px)}}
 .turn-start-overlay.show{animation:turnStartOverlay 1s ease-out forwards}.turn-start-card{min-width:280px;padding:22px 34px;border:1px solid #64769a;border-radius:16px;background:rgba(25,33,45,.94);box-shadow:0 18px 55px #0008;text-align:center}.turn-start-label{font-size:13px;color:#99a7ba;letter-spacing:3px}.turn-start-name{margin-top:6px;font-size:30px;font-weight:900;text-shadow:0 0 18px rgba(255,255,255,.16)}@keyframes turnStartOverlay{0%{opacity:0}15%{opacity:1}75%{opacity:1}100%{opacity:0}}
-.login,.result{position:fixed;top:72px;left:0;right:0;bottom:0;background:#081018ee;display:flex;align-items:center;justify-content:center;z-index:100}.card{width:min(560px,94vw);max-height:92vh;overflow:auto;background:#1b232e;border:1px solid #3a485c;border-radius:16px;padding:22px;box-shadow:0 25px 70px #0009}.card h1{margin:0;font-size:24px}.card p{font-size:12px;line-height:1.75;color:#aab5c4}.sep{height:1px;background:#2d3745;margin:16px 0}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;color:#99a6b7}.field input,.field select{padding:10px;border-radius:8px;border:1px solid #3c4a5f;background:#10161e;color:#fff}.section-title{font-size:12px;font-weight:800;margin:15px 0 8px}.role-choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}.role-card{padding:11px;border:1px solid #39475a;border-radius:9px;background:#141a22;cursor:pointer}.role-card.active{border-color:#7084bd;background:#29334b}.role-card strong{display:block;font-size:13px}.role-card span{font-size:10px;color:#8f9bad}.codebox{margin-top:12px;border:1px dashed #5d7196;border-radius:10px;padding:10px;text-align:center;background:#172134}.room-code{font-size:24px;font-weight:900;letter-spacing:5px;color:#f2cb68}.room-list{display:flex;flex-direction:column;gap:8px;max-height:45vh;overflow:auto}.room-item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px;border:1px solid #39475a;border-radius:10px;background:#141a22}.room-info strong{display:block;font-size:13px}.room-meta{margin-top:3px;font-size:10px;color:#8f9bad;line-height:1.5}.room-item .btn{padding:8px 12px;min-width:76px}.settings-box{width:min(460px,92vw)}.setting-row{margin:14px 0}.setting-row label{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#c5cfdb}.setting-row input[type=range]{width:100%;margin-top:8px}.upload-row{display:flex;gap:8px;align-items:center}.upload-row input[type=file]{flex:1;min-width:0;font-size:11px;color:#aab5c4}.settings-note{font-size:10px;color:#8190a3;line-height:1.6;margin-top:8px}.result-box{text-align:center}.result-title{font-size:28px;font-weight:900}.result-detail{margin:16px 0;color:#b7c1cf;line-height:1.7}
+  .login,.result{position:fixed;top:72px;left:0;right:0;bottom:0;background:#081018ee;display:flex;align-items:center;justify-content:center;z-index:100}.result{display:none!important}.card{width:min(560px,94vw);max-height:92vh;overflow:auto;background:#1b232e;border:1px solid #3a485c;border-radius:16px;padding:22px;box-shadow:0 25px 70px #0009}.card h1{margin:0;font-size:24px}.card p{font-size:12px;line-height:1.75;color:#aab5c4}.sep{height:1px;background:#2d3745;margin:16px 0}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;color:#99a6b7}.field input,.field select{padding:10px;border-radius:8px;border:1px solid #3c4a5f;background:#10161e;color:#fff}.section-title{font-size:12px;font-weight:800;margin:15px 0 8px}.role-choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}.role-card{padding:11px;border:1px solid #39475a;border-radius:9px;background:#141a22;cursor:pointer}.role-card.active{border-color:#7084bd;background:#29334b}.role-card strong{display:block;font-size:13px}.role-card span{font-size:10px;color:#8f9bad}.codebox{margin-top:12px;border:1px dashed #5d7196;border-radius:10px;padding:10px;text-align:center;background:#172134}.room-code{font-size:24px;font-weight:900;letter-spacing:5px;color:#f2cb68}.room-list{display:flex;flex-direction:column;gap:8px;max-height:45vh;overflow:auto}.room-item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px;border:1px solid #39475a;border-radius:10px;background:#141a22}.room-info strong{display:block;font-size:13px}.room-meta{margin-top:3px;font-size:10px;color:#8f9bad;line-height:1.5}.room-item .btn{padding:8px 12px;min-width:76px}.settings-box{width:min(460px,92vw)}.setting-row{margin:14px 0}.setting-row label{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#c5cfdb}.setting-row input[type=range]{width:100%;margin-top:8px}.upload-row{display:flex;gap:8px;align-items:center}.upload-row input[type=file]{flex:1;min-width:0;font-size:11px;color:#aab5c4}.settings-note{font-size:10px;color:#8190a3;line-height:1.6;margin-top:8px}.result-box{text-align:center}.result-title{font-size:28px;font-weight:900}.result-detail{margin:16px 0;color:#b7c1cf;line-height:1.7}.result-banner{width:min(790px,100%);margin-top:12px;padding:14px 18px;border:1px solid #687b9b;border-radius:12px;background:linear-gradient(135deg,#202c3d,#18212d);box-shadow:0 10px 28px #0007;text-align:center}.result-banner.win-attacker{border-color:#9b7651;background:linear-gradient(135deg,#493622,#28251f)}.result-banner.win-defender{border-color:#577b9a;background:linear-gradient(135deg,#243c50,#202a36)}.result-banner-title{font-size:21px;font-weight:900}.result-banner-detail{margin-top:4px;color:#c6d0dc;font-size:12px;line-height:1.6}.room-leave{width:100%;margin-top:7px}
 @media(max-width:1180px){.main{grid-template-columns:1fr}.side{border-left:0;border-top:1px solid #2a3442}.board-area{justify-content:flex-start}}
 
 /* 手机端响应式：桌面端样式保持不变 */
@@ -58,7 +58,7 @@ button{cursor:pointer}
   .pills{gap:5px;flex-shrink:0}
   .pill{padding:5px 8px;font-size:10px;white-space:nowrap}
   .main{display:flex;flex-direction:column;min-height:calc(100vh - 58px)}
-  .board-area{width:100%;padding:8px 0 4px;display:flex;justify-content:center;align-items:flex-start;overflow:hidden;position:relative}
+  .board-area{width:100%;padding:8px 0 4px;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;overflow:hidden;position:relative}
   .board{flex:0 0 790px;transform:scale(var(--mobile-board-scale,1));transform-origin:top center;margin:0;}
   .board-area{height:calc(724px * var(--mobile-board-scale,1) + 8px)}
   .side{width:100%;max-height:none;border:0;border-top:1px solid #2a3442;padding:10px;gap:9px;overflow:visible}
@@ -120,6 +120,20 @@ button{cursor:pointer}
       <h1>创建房间</h1>
       <p>房主可以选择自己的阵营，并自定义本房间的兵种上限、增援量及行动后部署规则。</p>
 
+      <div class="section-title">对战模式</div>
+      <div class="role-choice">
+        <div id="modePvp" class="role-card active" onclick="selectGameMode('pvp')"><strong>玩家对战</strong><span>等待另一名玩家加入</span></div>
+        <div id="modeAi" class="role-card" onclick="selectGameMode('ai')"><strong>人机对战</strong><span>立即开始，由服务器控制对手</span></div>
+      </div>
+      <div id="botOptions" class="field hidden" style="margin-top:9px">
+        <label for="botDifficulty">机器人难度</label>
+        <select id="botDifficulty">
+          <option value="easy">简单（更多随机选择）</option>
+          <option value="normal" selected>普通（推荐）</option>
+          <option value="hard">困难（重视威胁与站位）</option>
+        </select>
+      </div>
+
       <div class="section-title">我的阵营</div>
       <div class="role-choice">
         <div id="roleA" class="role-card active" onclick="selectHostRole('attacker')"><strong>进攻方</strong><span>默认先手 · 有增援 · 最多推进至第一行</span></div>
@@ -171,7 +185,7 @@ button{cursor:pointer}
     <div class="board-area"><div id="turnStartOverlay" class="turn-start-overlay"><div class="turn-start-card"><div class="turn-start-label">回合开始</div><div id="turnStartName" class="turn-start-name">进攻方</div></div></div><div class="board"><div id="chatOverlay" class="hidden"><div id="chatTop" class="chat-top"></div><div id="chatBottom" class="chat-bottom"></div></div><div id="fxLayer" class="fx-layer"></div><div class="grid">
       <div id="r1" class="row r1"></div><div id="r2" class="row r2"></div><div id="r3" class="row r3"></div>
       <div id="r4" class="row r4"></div><div id="r5" class="row r5"></div><div id="r6" class="row r6"></div>
-    </div></div></div>
+    </div></div><div id="resultBanner" class="result-banner hidden"><div id="resultBannerTitle" class="result-banner-title"></div><div id="resultBannerDetail" class="result-banner-detail"></div></div></div>
 
     <aside class="side">
       <div class="panel"><div class="pt">联机状态</div><div id="roomText" class="hint">尚未加入房间。</div><div id="configText" class="config-summary"></div></div>
@@ -187,7 +201,7 @@ button{cursor:pointer}
       <div class="panel"><div class="pt">操作</div><div class="rowbtn">
         <button id="endTurnBtn" class="btn primary" onclick="endTurn()">结束回合</button>
         <button class="btn" onclick="cancelSelection()">取消选择</button><button id="surrenderBtn" class="btn danger" onclick="surrender()">投降</button>
-      </div></div>
+      </div><button id="leaveRoomBtn" class="btn room-leave" onclick="leaveRoom()">退出房间</button></div>
 
       <div class="panel"><div class="pt">聊天</div><div class="chat-dock"><input id="chatInput" maxlength="200" placeholder="输入聊天内容，Enter 发送"><button id="chatSend" onclick="sendChat()">发送</button></div></div>
 
@@ -204,6 +218,7 @@ let roomId = null;
 let roomName = null;
 let lobbyRooms = [];
 let hostRole = 'attacker';
+let gameMode = 'pvp';
 let deployType = null;
 let lastChatText = '';
 let selectedId = null;
@@ -222,9 +237,11 @@ let surrenderTimer = null;
 const AUDIO = {
   manifest: null,
   bgm: null,
+  end: null,
   bgmUnlocked: false,
   lastEventAt: 0,
   lastBgmSrc: null,
+  lastEndEventAt: null,
   manifestLoaded: false,
   retryTimer: null,
   localBgmUrl: null,
@@ -257,7 +274,7 @@ async function loadAudioManifest(){
     AUDIO.manifest = Array.isArray(data.files) ? data : { files: [] };
     AUDIO.manifestLoaded = true;
     console.info(`[AUDIO] Loaded ${AUDIO.manifest.files.length} audio file(s).`);
-    startBackgroundMusic();
+    if(state?.state === 'ended') startEndMusic(); else startBackgroundMusic();
   } catch (err) {
     AUDIO.manifestLoaded = false;
     console.warn('[AUDIO] Failed to load /__audio_manifest:', err);
@@ -310,9 +327,22 @@ function startBackgroundMusic(){
   }
 }
 
+function startEndMusic(){
+  if(!AUDIO.bgmUnlocked || !AUDIO.manifestLoaded || !state || state.state!=='ended') return;
+  const eventAt=state.lastEvent?.at||0;
+  if(AUDIO.lastEndEventAt===eventAt) return;
+  const list=pathAudioList('/audio/end');
+  if(!list.length) return;
+  if(AUDIO.bgm){AUDIO.bgm.pause();AUDIO.bgm=null;}
+  if(AUDIO.end){AUDIO.end.pause();AUDIO.end=null;}
+  AUDIO.end=playAudioFile(randomItem(list),{volume:AUDIO.bgmVolume});
+  AUDIO.lastEndEventAt=eventAt||Date.now();
+  if(AUDIO.end) AUDIO.end.addEventListener('ended',()=>{AUDIO.end=null;},{once:true});
+}
+
 function unlockAudio(){
   AUDIO.bgmUnlocked = true;
-  startBackgroundMusic();
+  if(state?.state === 'ended') startEndMusic(); else startBackgroundMusic();
 }
 
 function playUnitSound(kind,type){
@@ -350,6 +380,17 @@ function connect(){
     if(m.type === 'surrenderProgress'){ updateSurrenderProgress(m.count, m.remainingMs); return; }
     if(m.type === 'chat'){ showChatText(m.role===role?'mine':'enemy', m.text); return; }
     if(m.type === 'lobby'){ lobbyRooms = m.rooms || []; renderLobby(); return; }
+    if(m.type === 'leftRoom'){
+      roomId=null; roomName=null; role=null; state=null; selectedId=null; deployType=null;
+      previousTurnPlayer=null; previousStarted=false; lastAnimatedEvent=0;
+      if(AUDIO.bgm){AUDIO.bgm.pause();AUDIO.bgm=null;} if(AUDIO.end){AUDIO.end.pause();AUDIO.end=null;}
+      AUDIO.lastEndEventAt=null;
+      document.getElementById('resultBanner')?.classList.add('hidden');
+      document.getElementById('gameModal').classList.add('hidden');
+      document.getElementById('login').classList.remove('hidden');
+      showLobby();
+      return;
+    }
     if(m.type === 'created' || m.type === 'joined'){
       roomId = m.id || null; roomName = m.name || null; role = m.role;
       document.getElementById('login').classList.add('hidden');
@@ -372,6 +413,13 @@ function selectHostRole(r){
   hostRole = r;
   document.getElementById('roleA').classList.toggle('active',r==='attacker');
   document.getElementById('roleD').classList.toggle('active',r==='defender');
+}
+
+function selectGameMode(mode){
+  gameMode = mode === 'ai' ? 'ai' : 'pvp';
+  document.getElementById('modePvp').classList.toggle('active',gameMode==='pvp');
+  document.getElementById('modeAi').classList.toggle('active',gameMode==='ai');
+  document.getElementById('botOptions').classList.toggle('hidden',gameMode!=='ai');
 }
 
 function val(id){return Number(document.getElementById(id).value);}
@@ -401,16 +449,20 @@ function renderLobby(){
   box.innerHTML=lobbyRooms.map(room=>{
     const config=room.config||{};
     const roleText=room.hostRole==='attacker'?'进攻方':'防守方';
+    const modeText=room.gameMode==='ai'?'人机对战':'玩家对战';
+    const difficultyText=room.gameMode==='ai'?` · ${botDifficultyName(room.botDifficulty)}`:'';
     const playing=room.status==='playing';
     const action=playing?'观战':(room.playerCount>=2?'观战':'加入');
-    return `<div class="room-item"><div class="room-info"><strong>${escapeHtml(room.name)}</strong><div class="room-meta">房主：${roleText} · ${room.playerCount}/2 · 观战：${room.spectatorCount||0}<br>增援：${config.reinforcement ?? '-'} · 行动后部署：${config.allowDeployAfterAction?'允许':'禁止'}${playing?' · 对战中':''}</div></div><button class="btn primary" onclick="joinRoom('${room.id}')">${action}</button></div>`;
+    return `<div class="room-item"><div class="room-info"><strong>${escapeHtml(room.name)}</strong><div class="room-meta">${modeText}${difficultyText} · 房主：${roleText} · ${room.playerCount}/2 · 观战：${room.spectatorCount||0}<br>增援：${config.reinforcement ?? '-'} · 行动后部署：${config.allowDeployAfterAction?'允许':'禁止'}${playing?' · 对战中':''}</div></div><button class="btn primary" onclick="joinRoom('${room.id}')">${action}</button></div>`;
   }).join('');
 }
 
 function escapeHtml(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
 
+function botDifficultyName(value){return ({easy:'简单',normal:'普通',hard:'困难'})[value]||'普通';}
+
 function createRoom(){
-  send('create',{hostRole,config:{
+  send('create',{hostRole,gameMode,botDifficulty:document.getElementById('botDifficulty').value,config:{
     reinforcement:val('reinforcement'),
     attackerInfantry:val('aInf'),attackerAntiTank:val('aAT'),attackerMachineGun:val('aMG'),
     defenderInfantry:val('dInf'),defenderAntiTank:val('dAT'),
@@ -426,6 +478,11 @@ function joinRoom(id){
 function surrender(){
   if(!state || !state.started || state.state!=='playing' || (role!=='attacker' && role!=='defender')) return;
   send('surrender');
+}
+
+function leaveRoom(){
+  if(!roomId) return;
+  send('leaveRoom');
 }
 
 function updateSurrenderProgress(count, remainingMs){
@@ -804,12 +861,13 @@ function render(){
   document.getElementById('turnPill').className='pill '+(state.currentPlayer===role?'good':'');
   document.getElementById('round').textContent=state.round;
   document.getElementById('reinforce').textContent=state.attackerReinforcement;
-  document.getElementById('roomText').innerHTML=state?.roomName?`<strong>${escapeHtml(state.roomName)}</strong> · ${state.roomPlayerCount}/2 · ${role==='spectator'?'观战中':`你是${role==='attacker'?'进攻方':'防守方'}`}${!state.started?' · 等待另一名玩家加入':''}`:'尚未加入房间。';
+  document.getElementById('roomText').innerHTML=state?.roomName?`<strong>${escapeHtml(state.roomName)}</strong> · ${state.gameMode==='ai'?`人机对战（${botDifficultyName(state.botDifficulty)}）`:'玩家对战'} · ${state.roomPlayerCount}/2 · ${role==='spectator'?'观战中':`你是${role==='attacker'?'进攻方':'防守方'}`}${state.botRole?` · 机器人是${state.botRole==='attacker'?'进攻方':'防守方'}`:''}${!state.started?' · 等待另一名玩家加入':''}`:'尚未加入房间。';
   document.getElementById('configText').textContent=state.config?configSummary():'';
   document.getElementById('deployHint').textContent=state.currentPlayer!==role?'等待对方回合。':`可部署在第${role==='attacker'?6:1}行；${role==='attacker'?`剩余增援 ${state.attackerReinforcement}`:'不消耗增援'}；行动后部署${state.config.allowDeployAfterAction?'已开启':'未开启'}。`;
   const canOperate=state.started&&state.state==='playing'&&(role==='attacker'||role==='defender')&&state.currentPlayer===role;
   document.getElementById('endTurnBtn').disabled=!canOperate;
   const surrenderBtn=document.getElementById('surrenderBtn'); if(surrenderBtn){ surrenderBtn.disabled=!canOperate; if(!canOperate){surrenderBtn.textContent='投降'; surrenderCount=0;} }
+  const leaveRoomBtn=document.getElementById('leaveRoomBtn'); if(leaveRoomBtn) leaveRoomBtn.disabled=!roomId;
 
   document.querySelectorAll('.unit-buttons button').forEach(b=>b.disabled=!canOperate);
   if(role==='defender') document.getElementById('bMG').disabled=true;
@@ -825,12 +883,24 @@ function render(){
   renderBoard();
   if(state.lastEvent && state.lastEvent.at>lastAnimatedEvent) startTransientEvent(state.lastEvent);
   if(state.lastEvent) playEventSound(state.lastEvent);
-  startBackgroundMusic();
+  if(state.state==='ended') startEndMusic(); else startBackgroundMusic();
 
   if(state.state==='ended'){
-    document.getElementById('resultTitle').textContent=role==='spectator'?'对局结束':(state.winner===role?'你获胜了':'你失败了');
-    document.getElementById('resultDetail').textContent=state.winner==='attacker'?'进攻方获胜。':'防守方获胜。';
-    document.getElementById('result').classList.remove('hidden');
+    const banner=document.getElementById('resultBanner');
+    const winnerText=state.winner==='attacker'?'进攻方获胜':'防守方获胜';
+    const reasonText={
+      attacker_reached_first_row:'进攻方战棋到达第一行。',
+      attacker_eliminated:'进攻方增援耗尽且场上已无存活战棋。',
+      surrender:`${state.winner==='attacker'?'防守方':'进攻方'}投降。`,
+      disconnect:`${state.winner==='attacker'?'防守方':'进攻方'}断开连接。`,
+      leave_room:`${state.winner==='attacker'?'防守方':'进攻方'}退出房间。`
+    }[state.winnerReason] || '对局已结束。';
+    document.getElementById('resultBannerTitle').textContent=winnerText;
+    document.getElementById('resultBannerDetail').textContent=reasonText;
+    banner.classList.remove('hidden','win-attacker','win-defender');
+    banner.classList.add(state.winner==='attacker'?'win-attacker':'win-defender');
+  } else {
+    document.getElementById('resultBanner').classList.add('hidden');
   }
 }
 
@@ -867,7 +937,7 @@ function updateMobileLayout(){
   const available=Math.max(280, window.innerWidth-8);
   const scale=Math.min(1, available/790);
   document.documentElement.style.setProperty('--mobile-board-scale', String(scale));
-  boardArea.style.height=`${Math.ceil(724*scale+8)}px`;
+  boardArea.style.height=`${Math.ceil(724*scale+92)}px`;
 }
 window.addEventListener('resize',updateMobileLayout,{passive:true});
 window.addEventListener('orientationchange',()=>setTimeout(updateMobileLayout,120),{passive:true});

@@ -20,9 +20,12 @@ button{cursor:pointer}
 .top-actions{display:flex;align-items:center;gap:8px}.settings-btn{width:36px;height:36px;border:1px solid #3a485b;border-radius:9px;background:#222c39;color:#e5edf6;font-size:18px;cursor:pointer}.settings-btn:hover{background:#2c3848}.pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pill{padding:7px 12px;border-radius:999px;background:#293445;font-size:12px}.pill.mine{background:#495d92}.pill.enemy{background:#75424d}.pill.good{background:#2d6a50}
 .main{display:grid;grid-template-columns:minmax(720px,1fr) 420px;min-height:calc(100vh - 72px)}
   .board-area{position:relative;padding:20px;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;overflow:auto}
-.board{position:relative;width:790px;height:720px;min-width:790px}.fx-layer{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visible}.fx-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}.fx-arrow{transform-box:fill-box;transform-origin:center;animation:fxArrowIn 1s ease-out forwards}.fx-arrow.move{stroke:#58a6ff;fill:#58a6ff;filter:drop-shadow(0 0 7px #58a6ff)}.fx-arrow.attack{stroke:#f2cb68;fill:#f2cb68;filter:drop-shadow(0 0 5px #f2cb68)}.corpse{position:absolute;width:54px;height:36px;border-radius:50%;border:2px solid #4e5965;background:radial-gradient(ellipse at center,#555f68 0%,#303740 60%,#20262c 100%);box-shadow:0 4px 10px #000a;transform:translate(-50%,-50%) rotate(-18deg);animation:corpseFade 1s ease-out forwards;z-index:19}.corpse::after{content:'☠';position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);font-size:20px;color:#9aa4ae;text-shadow:0 1px 3px #000}.corpse .corpse-label{position:absolute;left:50%;top:100%;transform:translate(-50%,4px);font-size:9px;color:#7f8993;white-space:nowrap}.grid{position:absolute;inset:48px 38px 24px}
-.row{position:absolute;left:0;width:100%;display:flex;justify-content:center;gap:12px}.r1{top:0}.r2{top:108px}.r3{top:216px}.r4{top:324px}.r5{top:432px}.r6{top:540px}
-.cell{position:relative;width:116px;height:90px;border:2px solid #394555;border-radius:13px;background:linear-gradient(145deg,#222a35,#1d242e);cursor:pointer;transition:none}
+.board{position:relative;width:var(--board-width,790px);height:var(--board-height,720px);min-width:var(--board-width,790px)}.fx-layer{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visible}.fx-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}.fx-arrow{transform-box:fill-box;transform-origin:center;animation:fxArrowIn 1s ease-out forwards}.fx-arrow.move{stroke:#58a6ff;fill:#58a6ff;filter:drop-shadow(0 0 7px #58a6ff)}.fx-arrow.attack{stroke:#f2cb68;fill:#f2cb68;filter:drop-shadow(0 0 5px #f2cb68)}.corpse{position:absolute;width:54px;height:36px;border-radius:50%;border:2px solid #4e5965;background:radial-gradient(ellipse at center,#555f68 0%,#303740 60%,#20262c 100%);box-shadow:0 4px 10px #000a;transform:translate(-50%,-50%) rotate(-18deg);animation:corpseFade 1s ease-out forwards;z-index:19}.corpse::after{content:'☠';position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);font-size:20px;color:#9aa4ae;text-shadow:0 1px 3px #000}.corpse .corpse-label{position:absolute;left:50%;top:100%;transform:translate(-50%,4px);font-size:9px;color:#7f8993;white-space:nowrap}.grid{position:absolute;top:var(--grid-top,48px);right:var(--grid-right,38px);bottom:var(--grid-bottom,24px);left:var(--grid-left,38px)}
+.row{position:absolute;left:0;width:100%;display:flex;justify-content:center;gap:var(--cell-gap,12px)}
+.cell{position:relative;width:var(--cell-width,116px);height:var(--cell-height,90px);flex:0 0 auto;border:2px solid #394555;border-radius:13px;background:linear-gradient(145deg,#222a35,#1d242e);cursor:pointer;transition:none}
+.cell{background:var(--terrain-background,linear-gradient(145deg,#222a35,#1d242e));border-color:var(--terrain-border,#394555)}
+.parameter-group{margin-top:12px;padding:10px;border:1px solid #303d4f;border-radius:8px;background:#10161e}.parameter-group-title{font-size:11px;font-weight:800;color:#cbd5e2;margin-bottom:8px}.parameter-group .form-grid{gap:8px}
+.role-card.disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.35)}
 .cell:hover{transform:none;border-color:#6e7e95}.cell.move{box-shadow:inset 0 0 0 3px rgba(89,206,145,.9);background:linear-gradient(145deg,#233b30,#1d2f27)}
 .cell.shoot{box-shadow:inset 0 0 0 3px rgba(223,113,120,.95);background:linear-gradient(145deg,#45272c,#2f2024)}
 .cell.deployable{box-shadow:inset 0 0 0 3px rgba(101,161,220,.8);background:linear-gradient(145deg,#24354a,#202c3c)}
@@ -46,7 +49,7 @@ button{cursor:pointer}
 .game-modal{position:fixed;top:72px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(4,8,13,.48);z-index:120}.game-modal.hidden{display:none}.game-modal-card{width:min(420px,88vw);padding:22px;border:1px solid #4d5d76;border-radius:14px;background:#1b2430;box-shadow:0 22px 70px #000b;text-align:center}.game-modal-title{font-size:18px;font-weight:900}.game-modal-text{margin:10px 0 18px;color:#aeb9c7;font-size:12px;line-height:1.7}.game-modal-card .btn{min-width:120px}
 .chat-top,.chat-bottom{position:absolute;z-index:110;pointer-events:none;width:min(430px,42%);display:flex;flex-direction:column;gap:4px;font-size:22px;line-height:1.35}.chat-top{left:20px;top:20px;align-items:flex-start}.chat-bottom{right:20px;bottom:20px;align-items:flex-end}.chat-line{color:#eef3f9;text-shadow:0 2px 6px #000;opacity:0;animation:chatTextIn .15s ease-out forwards,chatTextOut .45s ease-in 1.55s forwards}.chat-line.mine{color:#dce8ff}.chat-line.enemy{color:#ffe1e4}.chat-dock{display:flex;gap:7px;padding:0}.chat-dock input{flex:1;min-width:0;border:1px solid #3c4a5e;border-radius:8px;padding:9px 11px;background:#0e141b;color:#fff;outline:none}.chat-dock button{border:0;border-radius:8px;padding:9px 15px;background:#5969a6;color:#fff}.chat-dock button:disabled{opacity:.4;cursor:not-allowed}@keyframes chatTextIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}@keyframes chatTextOut{to{opacity:0;transform:translateY(-4px)}}
 .turn-start-overlay.show{animation:turnStartOverlay 1s ease-out forwards}.turn-start-card{min-width:280px;padding:22px 34px;border:1px solid #64769a;border-radius:16px;background:rgba(25,33,45,.94);box-shadow:0 18px 55px #0008;text-align:center}.turn-start-label{font-size:13px;color:#99a7ba;letter-spacing:3px}.turn-start-name{margin-top:6px;font-size:30px;font-weight:900;text-shadow:0 0 18px rgba(255,255,255,.16)}@keyframes turnStartOverlay{0%{opacity:0}15%{opacity:1}75%{opacity:1}100%{opacity:0}}
-  .login,.result{position:fixed;top:72px;left:0;right:0;bottom:0;background:#081018ee;display:flex;align-items:center;justify-content:center;z-index:100}.result{display:none!important}.card{width:min(560px,94vw);max-height:92vh;overflow:auto;background:#1b232e;border:1px solid #3a485c;border-radius:16px;padding:22px;box-shadow:0 25px 70px #0009}.card h1{margin:0;font-size:24px}.card p{font-size:12px;line-height:1.75;color:#aab5c4}.sep{height:1px;background:#2d3745;margin:16px 0}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;color:#99a6b7}.field input,.field select{padding:10px;border-radius:8px;border:1px solid #3c4a5f;background:#10161e;color:#fff}.section-title{font-size:12px;font-weight:800;margin:15px 0 8px}.role-choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}.role-card{padding:11px;border:1px solid #39475a;border-radius:9px;background:#141a22;cursor:pointer}.role-card.active{border-color:#7084bd;background:#29334b}.role-card strong{display:block;font-size:13px}.role-card span{font-size:10px;color:#8f9bad}.codebox{margin-top:12px;border:1px dashed #5d7196;border-radius:10px;padding:10px;text-align:center;background:#172134}.room-code{font-size:24px;font-weight:900;letter-spacing:5px;color:#f2cb68}.room-list{display:flex;flex-direction:column;gap:8px;max-height:45vh;overflow:auto}.room-item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px;border:1px solid #39475a;border-radius:10px;background:#141a22}.room-info strong{display:block;font-size:13px}.room-meta{margin-top:3px;font-size:10px;color:#8f9bad;line-height:1.5}.room-item .btn{padding:8px 12px;min-width:76px}.settings-box{width:min(460px,92vw)}.setting-row{margin:14px 0}.setting-row label{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#c5cfdb}.setting-row input[type=range]{width:100%;margin-top:8px}.upload-row{display:flex;gap:8px;align-items:center}.upload-row input[type=file]{flex:1;min-width:0;font-size:11px;color:#aab5c4}.settings-note{font-size:10px;color:#8190a3;line-height:1.6;margin-top:8px}.result-box{text-align:center}.result-title{font-size:28px;font-weight:900}.result-detail{margin:16px 0;color:#b7c1cf;line-height:1.7}.result-banner{width:min(790px,100%);margin-top:12px;padding:14px 18px;border:1px solid #687b9b;border-radius:12px;background:linear-gradient(135deg,#202c3d,#18212d);box-shadow:0 10px 28px #0007;text-align:center}.result-banner.win-attacker{border-color:#9b7651;background:linear-gradient(135deg,#493622,#28251f)}.result-banner.win-defender{border-color:#577b9a;background:linear-gradient(135deg,#243c50,#202a36)}.result-banner-title{font-size:21px;font-weight:900}.result-banner-detail{margin-top:4px;color:#c6d0dc;font-size:12px;line-height:1.6}.room-leave{width:100%;margin-top:7px}
+  .login{position:fixed;top:0;left:0;right:0;bottom:0;background:#081018;display:flex;align-items:center;justify-content:center;z-index:100}.card{width:min(560px,94vw);max-height:92vh;overflow:auto;background:#1b232e;border:1px solid #3a485c;border-radius:16px;padding:22px;box-shadow:0 25px 70px #0009}.card h1{margin:0;font-size:24px}.card p{font-size:12px;line-height:1.75;color:#aab5c4}.sep{height:1px;background:#2d3745;margin:16px 0}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;color:#99a6b7}.field input,.field select{padding:10px;border-radius:8px;border:1px solid #3c4a5f;background:#10161e;color:#fff}.section-title{font-size:12px;font-weight:800;margin:15px 0 8px}.role-choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}.role-card{padding:11px;border:1px solid #39475a;border-radius:9px;background:#141a22;cursor:pointer}.role-card.active{border-color:#7084bd;background:#29334b}.role-card strong{display:block;font-size:13px}.role-card span{font-size:10px;color:#8f9bad}.game-parameters{margin-top:15px;border:1px solid #39475a;border-radius:8px;background:#141a22}.game-parameters summary{padding:12px 14px;cursor:pointer;font-size:12px;font-weight:800;list-style-position:inside}.game-parameters[open] summary{border-bottom:1px solid #39475a}.game-parameters-body{padding:12px 14px 14px}.parameter-toggle{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:11px;color:#c4ceda;cursor:pointer}.codebox{margin-top:12px;border:1px dashed #5d7196;border-radius:10px;padding:10px;text-align:center;background:#172134}.room-code{font-size:24px;font-weight:900;letter-spacing:5px;color:#f2cb68}.room-list{display:flex;flex-direction:column;gap:8px;max-height:45vh;overflow:auto}.room-item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px;border:1px solid #39475a;border-radius:10px;background:#141a22}.room-info strong{display:block;font-size:13px}.room-meta{margin-top:3px;font-size:10px;color:#8f9bad;line-height:1.5}.room-item .btn{padding:8px 12px;min-width:76px}.settings-box{width:min(460px,92vw)}.setting-row{margin:14px 0}.setting-row label{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#c5cfdb}.setting-row input[type=range]{width:100%;margin-top:8px}.upload-row{display:flex;gap:8px;align-items:center}.upload-row input[type=file]{flex:1;min-width:0;font-size:11px;color:#aab5c4}.settings-note{font-size:10px;color:#8190a3;line-height:1.6;margin-top:8px}.result-banner{width:min(var(--board-width,790px),100%);margin-top:12px;padding:14px 18px;border:1px solid #687b9b;border-radius:12px;background:linear-gradient(135deg,#202c3d,#18212d);box-shadow:0 10px 28px #0007;text-align:center}.result-banner.win-attacker{border-color:#9b7651;background:linear-gradient(135deg,#493622,#28251f)}.result-banner.win-defender{border-color:#577b9a;background:linear-gradient(135deg,#243c50,#202a36)}.result-banner-title{font-size:21px;font-weight:900}.result-banner-detail{margin-top:4px;color:#c6d0dc;font-size:12px;line-height:1.6}.room-leave{width:100%;margin-top:7px}
 @media(max-width:1180px){.main{grid-template-columns:1fr}.side{border-left:0;border-top:1px solid #2a3442}.board-area{justify-content:flex-start}}
 
 /* 手机端响应式：桌面端样式保持不变 */
@@ -59,8 +62,7 @@ button{cursor:pointer}
   .pill{padding:5px 8px;font-size:10px;white-space:nowrap}
   .main{display:flex;flex-direction:column;min-height:calc(100vh - 58px)}
   .board-area{width:100%;padding:8px 0 4px;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;overflow:hidden;position:relative}
-  .board{flex:0 0 790px;transform:scale(var(--mobile-board-scale,1));transform-origin:top center;margin:0;}
-  .board-area{height:calc(724px * var(--mobile-board-scale,1) + 8px)}
+  .board{flex:0 0 var(--board-height,0px);transform:scale(var(--mobile-board-scale,1));transform-origin:top center;margin:0;}
   .side{width:100%;max-height:none;border:0;border-top:1px solid #2a3442;padding:10px;gap:9px;overflow:visible}
   .panel{padding:10px;border-radius:10px}
   .pt{font-size:13px;margin-bottom:8px}
@@ -75,7 +77,7 @@ button{cursor:pointer}
   .chat-dock input{font-size:16px;min-height:42px;padding:9px 10px}
   .chat-dock button{min-height:42px;padding:9px 13px}
   .log{height:150px;font-size:10px}
-  .login,.result,.game-modal{top:58px}
+  .game-modal{top:58px}
   .card{width:calc(100vw - 20px);max-height:calc(100vh - 68px);padding:16px;border-radius:14px}
   .card h1{font-size:21px}
   .form-grid{grid-template-columns:1fr;gap:8px}
@@ -120,18 +122,14 @@ button{cursor:pointer}
       <h1>创建房间</h1>
       <p>房主可以选择自己的阵营，并自定义本房间的兵种上限、增援量及行动后部署规则。</p>
 
-      <div class="section-title">对战模式</div>
+      <div class="section-title">对战类型</div>
       <div class="role-choice">
-        <div id="modePvp" class="role-card active" onclick="selectGameMode('pvp')"><strong>玩家对战</strong><span>等待另一名玩家加入</span></div>
-        <div id="modeAi" class="role-card" onclick="selectGameMode('ai')"><strong>人机对战</strong><span>立即开始，由服务器控制对手</span></div>
+        <div id="campaignMode" class="role-card disabled" aria-disabled="true"><strong>战役模式</strong><span>暂未实现</span></div>
+        <div id="battleMode" class="role-card active" onclick="selectPlayCategory('battle')"><strong>对战模式</strong><span>与其他玩家或机器人对战</span></div>
       </div>
-      <div id="botOptions" class="field hidden" style="margin-top:9px">
-        <label for="botDifficulty">机器人难度</label>
-        <select id="botDifficulty">
-          <option value="easy">简单（更多随机选择）</option>
-          <option value="normal" selected>普通（推荐）</option>
-          <option value="hard">困难（重视威胁与站位）</option>
-        </select>
+      <div id="battleModeOptions" class="field" style="margin-top:9px">
+        <label for="variantId">模式</label>
+        <select id="variantId" onchange="onVariantChanged()"><option value="" selected>等待服务器提供模式…</option></select>
       </div>
 
       <div class="section-title">我的阵营</div>
@@ -140,18 +138,35 @@ button{cursor:pointer}
         <div id="roleD" class="role-card" onclick="selectHostRole('defender')"><strong>防守方</strong><span>阻止进攻方到达第一行 · 无限免费部署</span></div>
       </div>
 
-      <div class="section-title">房间规则</div>
-      <label style="display:flex;align-items:center;gap:8px;margin:8px 0 10px;font-size:11px;color:#c4ceda;cursor:pointer"><input id="allowDeployAfterAction" type="checkbox"> 允许行动后部署单位 <span style="color:#7f8da0">（默认关闭）</span></label>
-      <div class="form-grid">
-        <div class="field"><label>进攻方增援量</label><input id="reinforcement" type="number" min="1" max="999" value="28"></div>
-        <div></div>
-        <div class="field"><label>进攻方步兵上限</label><input id="aInf" type="number" min="0" max="50" value="5"></div>
-        <div class="field"><label>防守方步兵上限</label><input id="dInf" type="number" min="0" max="50" value="4"></div>
-        <div class="field"><label>进攻方反坦克炮上限</label><input id="aAT" type="number" min="0" max="10" value="1"></div>
-        <div class="field"><label>防守方反坦克炮上限</label><input id="dAT" type="number" min="0" max="10" value="1"></div>
-        <div class="field"><label>进攻方机枪车上限</label><input id="aMG" type="number" min="0" max="10" value="1"></div>
-        <div class="field"><label>防守方机枪车上限（规则固定为0）</label><input type="number" value="0" disabled></div>
-      </div>
+      <details id="gameParameters" class="game-parameters">
+        <summary>游戏参数</summary>
+        <div class="game-parameters-body">
+          <section id="attackerForceSettings" class="parameter-group" aria-labelledby="attackerForceSettingsTitle">
+            <div id="attackerForceSettingsTitle" class="parameter-group-title">进攻方兵力设置</div>
+            <div class="form-grid"><div class="field"><label for="reinforcement">增援量</label><input id="reinforcement" type="number" min="0" max="999999" value="28"></div><div id="attackerForceFields" class="form-grid"></div></div>
+          </section>
+
+          <section id="defenderForceSettings" class="parameter-group" aria-labelledby="defenderForceSettingsTitle">
+            <div id="defenderForceSettingsTitle" class="parameter-group-title">防守方兵力设置</div>
+            <div id="defenderForceFields" class="form-grid"></div>
+          </section>
+
+          <div id="deploymentRuleSettings" class="parameter-group">
+            <div class="parameter-group-title">对战设置</div>
+            <label class="parameter-toggle"><input id="playAgainstAi" type="checkbox" onchange="toggleAiOptions()"> 与人机对战 <span style="color:#7f8da0">（默认关闭）</span></label>
+            <div id="botOptions" class="field hidden" style="margin-bottom:12px">
+              <label for="botDifficulty">机器人难度</label>
+              <select id="botDifficulty">
+                <option value="easy">简单（更多随机选择）</option>
+                <option value="normal" selected>普通（推荐）</option>
+                <option value="hard">困难（重视威胁与站位）</option>
+              </select>
+            </div>
+            <div class="parameter-group-title">部署规则</div>
+            <label class="parameter-toggle"><input id="allowDeployAfterAction" type="checkbox" checked> 允许行动后部署单位 <span style="color:#7f8da0">（默认开启）</span></label>
+          </div>
+        </div>
+      </details>
 
       <div style="margin-top:15px" class="rowbtn">
         <button class="btn primary" onclick="createRoom()">创建房间</button>
@@ -161,46 +176,30 @@ button{cursor:pointer}
   </div>
 </div>
 
-<div id="result" class="result hidden">
-  <div class="card result-box">
-    <div id="resultTitle" class="result-title"></div>
-    <div id="resultDetail" class="result-detail"></div>
-    <button class="btn primary" style="width:100%" onclick="location.reload()">重新连接</button>
-  </div>
-</div>
-
-
 <div id="gameModal" class="game-modal hidden"><div class="game-modal-card"><div id="gameModalTitle" class="game-modal-title">提示</div><div id="gameModalText" class="game-modal-text"></div><button class="btn primary" onclick="closeGameModal()">确定</button></div></div>
 
 <div id="settingsModal" class="game-modal hidden"><div class="game-modal-card settings-box"><div class="game-modal-title">设置</div><div class="setting-row"><label>背景音乐音量 <span id="bgmVolumeValue">100%</span></label><input id="bgmVolume" type="range" min="0" max="100" value="100" oninput="setVolumeFromUI()"></div><div class="setting-row"><label>音效音量 <span id="sfxVolumeValue">100%</span></label><input id="sfxVolume" type="range" min="0" max="100" value="100" oninput="setVolumeFromUI()"></div><div class="setting-row"><label>自定义 BGM</label><div class="upload-row"><input id="customBgmInput" type="file" accept=".mp3,audio/mpeg" onchange="useCustomBgm(event)"><button class="btn" onclick="restoreBuiltInBgm()">恢复内置</button></div><div id="customBgmName" class="settings-note">未选择自定义音乐。</div><div class="settings-note">自定义 MP3 仅在当前浏览器本地播放，不会上传到服务器。</div></div><button class="btn primary" style="width:100%;margin-top:6px" onclick="closeSettings()">关闭</button></div></div>
 
 
-<div class="app">
+<div id="gameApp" class="app hidden">
   <header class="topbar">
     <div><div class="title">HOMG0 自走棋战棋 · 局域网版</div><div class="subtitle">服务器权威判定 · 实时同步 · 行动状态可视化</div></div>
     <div class="top-actions"><div class="pills"><span id="rolePill" class="pill">未进入房间</span><span id="turnPill" class="pill">等待</span></div><button class="settings-btn" onclick="openSettings()" aria-label="设置">⚙</button></div>
   </header>
 
   <div class="main">
-    <div class="board-area"><div id="turnStartOverlay" class="turn-start-overlay"><div class="turn-start-card"><div class="turn-start-label">回合开始</div><div id="turnStartName" class="turn-start-name">进攻方</div></div></div><div class="board"><div id="chatOverlay" class="hidden"><div id="chatTop" class="chat-top"></div><div id="chatBottom" class="chat-bottom"></div></div><div id="fxLayer" class="fx-layer"></div><div class="grid">
-      <div id="r1" class="row r1"></div><div id="r2" class="row r2"></div><div id="r3" class="row r3"></div>
-      <div id="r4" class="row r4"></div><div id="r5" class="row r5"></div><div id="r6" class="row r6"></div>
-    </div></div><div id="resultBanner" class="result-banner hidden"><div id="resultBannerTitle" class="result-banner-title"></div><div id="resultBannerDetail" class="result-banner-detail"></div></div></div>
+    <div class="board-area"><div id="turnStartOverlay" class="turn-start-overlay"><div class="turn-start-card"><div class="turn-start-label">回合开始</div><div id="turnStartName" class="turn-start-name">进攻方</div></div></div><div id="board" class="board"><svg id="mapConnections" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:visible"></svg><div id="chatOverlay" class="hidden"><div id="chatTop" class="chat-top"></div><div id="chatBottom" class="chat-bottom"></div></div><div id="fxLayer" class="fx-layer"></div><div id="boardGrid" class="grid" style="z-index:1"></div></div><div id="resultBanner" class="result-banner hidden"><div id="resultBannerTitle" class="result-banner-title"></div><div id="resultBannerDetail" class="result-banner-detail"></div></div></div>
 
     <aside class="side">
       <div class="panel"><div class="pt">联机状态</div><div id="roomText" class="hint">尚未加入房间。</div><div id="configText" class="config-summary"></div></div>
 
       <div class="panel"><div class="pt">游戏状态</div><div class="grid2"><div class="stat"><div class="sl">回合</div><div id="round" class="sv">-</div></div><div class="stat"><div class="sl">进攻增援</div><div id="reinforce" class="sv">-</div></div></div></div>
 
-      <div class="panel"><div class="pt">部署</div><div id="deployHint" class="hint">进入房间后可操作。</div><div class="unit-buttons">
-        <button id="bInf" onclick="chooseDeploy('infantry')">步兵</button>
-        <button id="bAT" onclick="chooseDeploy('antiTank')">反坦克炮</button>
-        <button id="bMG" onclick="chooseDeploy('machineGun')">机枪车</button>
-      </div></div>
+      <div class="panel"><div class="pt">部署</div><div id="deployHint" class="hint">进入房间后可操作。</div><div id="unitButtons" class="unit-buttons"></div></div>
 
       <div class="panel"><div class="pt">操作</div><div class="rowbtn">
         <button id="endTurnBtn" class="btn primary" onclick="endTurn()">结束回合</button>
-        <button class="btn" onclick="cancelSelection()">取消选择</button><button id="surrenderBtn" class="btn danger" onclick="surrender()">投降</button>
+        <button id="cancelSelectionBtn" class="btn" onclick="cancelSelection()">取消选择</button><button id="surrenderBtn" class="btn danger" onclick="surrender()">投降</button>
       </div><button id="leaveRoomBtn" class="btn room-leave" onclick="leaveRoom()">退出房间</button></div>
 
       <div class="panel"><div class="pt">聊天</div><div class="chat-dock"><input id="chatInput" maxlength="200" placeholder="输入聊天内容，Enter 发送"><button id="chatSend" onclick="sendChat()">发送</button></div></div>
@@ -219,6 +218,7 @@ let roomName = null;
 let lobbyRooms = [];
 let hostRole = 'attacker';
 let gameMode = 'pvp';
+let playCategory = 'battle';
 let deployType = null;
 let lastChatText = '';
 let selectedId = null;
@@ -232,6 +232,13 @@ let activeCorpse = null;
 let activeCorpseTimer = null;
 let surrenderCount = 0;
 let surrenderTimer = null;
+let boardLayoutSignature = '';
+let boardLayout = null;
+const cellElements = new Map();
+let ruleDefinitions = null;
+let unitDefinitions = Object.create(null);
+let variantCatalog = [];
+let selectedVariantId = '';
 
 /* 可选音效系统：服务器扫描 public/audio/，没有对应文件就不播放。 */
 const AUDIO = {
@@ -302,6 +309,7 @@ function playAudioFile(src,{loop=false,volume=1}={}){
 }
 
 function startBackgroundMusic(){
+  if(state?.state === 'ended') return;
   if(!AUDIO.bgmUnlocked || !AUDIO.manifestLoaded) return;
   if(AUDIO.localBgmUrl){
     if(AUDIO.bgm && !AUDIO.bgm.paused && AUDIO.bgm.src === new URL(AUDIO.localBgmUrl, location.href).href) return;
@@ -363,11 +371,36 @@ function playEventSound(ev){
   }
 }
 
-const TYPE = {
-  infantry: {name:'步兵', short:'步', range:2},
-  antiTank: {name:'反坦克炮', short:'炮', range:3},
-  machineGun: {name:'机枪车', short:'机', range:2}
-};
+function normalizeRules(raw){
+  if(!raw||typeof raw!=='object') return null;
+  const units=raw.units&&typeof raw.units==='object'?raw.units:{};
+  const terrain=raw.terrain&&typeof raw.terrain==='object'?raw.terrain:{};
+  const cleanUnits=Object.create(null);
+  for(const [id,value] of Object.entries(units).slice(0,100)){
+    if(!/^[a-zA-Z0-9_-]{1,48}$/.test(id)||!value||typeof value!=='object') continue;
+    cleanUnits[id]={
+      name:String(value.name||id).slice(0,80), short:String(value.short||'?').slice(0,8),
+      range:Number.isFinite(Number(value.range))?Number(value.range):null,
+      maxMoveSteps:Number.isFinite(Number(value.maxMoveSteps))?Number(value.maxMoveSteps):null,
+      icon:typeof value.icon==='string'&&value.icon.startsWith('/')?value.icon:null
+    };
+  }
+  const cleanTerrain=Object.create(null);
+  for(const [id,value] of Object.entries(terrain).slice(0,100)){
+    if(!/^[a-zA-Z0-9_-]{1,48}$/.test(id)||!value||typeof value!=='object') continue;
+    cleanTerrain[id]={
+      name:String(value.name||id).slice(0,80), color:typeof value.color==='string'?value.color:null,
+      borderColor:typeof value.borderColor==='string'?value.borderColor:null,
+      symbol:String(value.symbol||'').slice(0,4)
+    };
+  }
+  if(!Object.keys(cleanUnits).length||!Object.keys(cleanTerrain).length) return null;
+  return {id:String(raw.id||'').slice(0,64),version:Number(raw.version)||1,units:cleanUnits,terrain:cleanTerrain,combat:raw.combat||{},turn:raw.turn||{},victory:raw.victory||{},configDefaults:raw.configDefaults||{},ai:raw.ai||{},ui:raw.ui||{}};
+}
+
+function unitRule(type){return unitDefinitions[type]||null;}
+function terrainRule(id){return ruleDefinitions?.terrain?.[id]||null;}
+function playerName(player){return ruleDefinitions?.ui?.players?.[player]||({attacker:'进攻方',defender:'防守方'}[player]||player||'未知阵营');}
 
 function connect(){
   ws = new WebSocket(serverUrl());
@@ -377,6 +410,11 @@ function connect(){
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if(m.type === 'error'){ showGameModal(m.message, '提示'); return; }
+    if(m.type === 'hello'){
+      variantCatalog = Array.isArray(m.variants) ? m.variants : [];
+      renderVariantOptions();
+      return;
+    }
     if(m.type === 'surrenderProgress'){ updateSurrenderProgress(m.count, m.remainingMs); return; }
     if(m.type === 'chat'){ showChatText(m.role===role?'mine':'enemy', m.text); return; }
     if(m.type === 'lobby'){ lobbyRooms = m.rooms || []; renderLobby(); return; }
@@ -387,18 +425,27 @@ function connect(){
       AUDIO.lastEndEventAt=null;
       document.getElementById('resultBanner')?.classList.add('hidden');
       document.getElementById('gameModal').classList.add('hidden');
+      document.getElementById('gameApp').classList.add('hidden');
       document.getElementById('login').classList.remove('hidden');
+      resetBoardLayout();
       showLobby();
       return;
     }
     if(m.type === 'created' || m.type === 'joined'){
       roomId = m.id || null; roomName = m.name || null; role = m.role;
       document.getElementById('login').classList.add('hidden');
+      document.getElementById('gameApp').classList.remove('hidden');
+      updateMobileLayout();
     }
     if(m.type === 'state'){
       state = m.state;
       role = state.you;
       roomName = state.roomName || roomName;
+      ruleDefinitions = normalizeRules(state.rules);
+      unitDefinitions = ruleDefinitions?.units || Object.create(null);
+      renderUnitControls();
+      document.getElementById('login').classList.add('hidden');
+      document.getElementById('gameApp').classList.remove('hidden');
       if(selectedId != null && !state.units.some(u=>u.id===selectedId)) selectedId = null;
       render();
     }
@@ -415,11 +462,24 @@ function selectHostRole(r){
   document.getElementById('roleD').classList.toggle('active',r==='defender');
 }
 
-function selectGameMode(mode){
-  gameMode = mode === 'ai' ? 'ai' : 'pvp';
-  document.getElementById('modePvp').classList.toggle('active',gameMode==='pvp');
-  document.getElementById('modeAi').classList.toggle('active',gameMode==='ai');
-  document.getElementById('botOptions').classList.toggle('hidden',gameMode!=='ai');
+function selectPlayCategory(category){
+  playCategory='battle';
+  document.getElementById('campaignMode').classList.remove('active');
+  document.getElementById('battleMode').classList.add('active');
+  document.getElementById('battleModeOptions').classList.remove('hidden');
+}
+
+function toggleAiOptions(){
+  const enabled=document.getElementById('playAgainstAi').checked;
+  const variant=variantCatalog.find(item=>item.id===selectedVariantId);
+  if(enabled && variant && variant.supportsAi!==true){
+    document.getElementById('playAgainstAi').checked=false;
+    gameMode='pvp';
+    showGameModal('当前玩法暂不支持人机对战。','提示');
+    return;
+  }
+  gameMode=enabled?'ai':'pvp';
+  document.getElementById('botOptions').classList.toggle('hidden',!enabled);
 }
 
 function val(id){return Number(document.getElementById(id).value);}
@@ -427,6 +487,8 @@ function val(id){return Number(document.getElementById(id).value);}
 function showCreateRoom(){
   document.getElementById('lobbyView').classList.add('hidden');
   document.getElementById('createView').classList.remove('hidden');
+  toggleAiOptions();
+  renderVariantOptions();
 }
 
 function showLobby(){
@@ -437,6 +499,20 @@ function showLobby(){
 
 function refreshLobby(){
   send('listRooms');
+}
+
+function renderUnitControls(){
+  const box=document.getElementById('unitButtons');
+  if(!box) return;
+  box.replaceChildren();
+  for(const [type,rule] of Object.entries(unitDefinitions)){
+    const button=document.createElement('button');
+    button.type='button';
+    button.dataset.type=type;
+    button.textContent=rule.name||type;
+    button.onclick=()=>chooseDeploy(type);
+    box.appendChild(button);
+  }
 }
 
 function renderLobby(){
@@ -450,10 +526,11 @@ function renderLobby(){
     const config=room.config||{};
     const roleText=room.hostRole==='attacker'?'进攻方':'防守方';
     const modeText=room.gameMode==='ai'?'人机对战':'玩家对战';
+    const variantText=escapeHtml(room.variant?.name||'经典模式');
     const difficultyText=room.gameMode==='ai'?` · ${botDifficultyName(room.botDifficulty)}`:'';
     const playing=room.status==='playing';
     const action=playing?'观战':(room.playerCount>=2?'观战':'加入');
-    return `<div class="room-item"><div class="room-info"><strong>${escapeHtml(room.name)}</strong><div class="room-meta">${modeText}${difficultyText} · 房主：${roleText} · ${room.playerCount}/2 · 观战：${room.spectatorCount||0}<br>增援：${config.reinforcement ?? '-'} · 行动后部署：${config.allowDeployAfterAction?'允许':'禁止'}${playing?' · 对战中':''}</div></div><button class="btn primary" onclick="joinRoom('${room.id}')">${action}</button></div>`;
+    return `<div class="room-item"><div class="room-info"><strong>${escapeHtml(room.name)}</strong><div class="room-meta">${variantText} · ${modeText}${difficultyText} · 房主：${roleText} · ${room.playerCount}/2 · 观战：${room.spectatorCount||0}<br>增援：${config.reinforcement ?? '-'} · 行动后部署：${config.allowDeployAfterAction?'允许':'禁止'}${playing?' · 对战中':''}</div></div><button class="btn primary" onclick="joinRoom('${room.id}')">${action}</button></div>`;
   }).join('');
 }
 
@@ -461,11 +538,60 @@ function escapeHtml(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':
 
 function botDifficultyName(value){return ({easy:'简单',normal:'普通',hard:'困难'})[value]||'普通';}
 
+function currentVariant(){return variantCatalog.find(item=>item.id===selectedVariantId)||null;}
+function renderVariantOptions(){
+  const select=document.getElementById('variantId');
+  if(!select)return;
+  const variants=variantCatalog.filter(item=>item&&item.enabled!==false&&item.category==='battle');
+  const previous=selectedVariantId;
+  select.replaceChildren();
+  for(const variant of variants){
+    const option=document.createElement('option'); option.value=variant.id; option.textContent=variant.name||variant.id; select.appendChild(option);
+  }
+  selectedVariantId=variants.some(item=>item.id===previous)?previous:(variants[0]?.id||'');
+  select.value=selectedVariantId;
+  select.disabled=!variants.length;
+  renderVariantConfig();
+}
+function onVariantChanged(){
+  selectedVariantId=document.getElementById('variantId').value||'';
+  renderVariantConfig();
+  toggleAiOptions();
+}
+function renderVariantConfig(){
+  const variant=currentVariant();
+  const attacker=document.getElementById('attackerForceFields');
+  const defender=document.getElementById('defenderForceFields');
+  if(!attacker||!defender)return;
+  attacker.replaceChildren(); defender.replaceChildren();
+  const units=variant?.units&&typeof variant.units==='object'?variant.units:{};
+  for(const [type,definition] of Object.entries(units)){
+    const makeField=(player,container)=>{
+      if(!Array.isArray(definition.allowedPlayers)||!definition.allowedPlayers.includes(player))return;
+      const defaults=variant?.defaults?.[player+'Max']||{};
+      const field=document.createElement('div'); field.className='field';
+      const inputId=`max-${player}-${type}`;
+      field.innerHTML=`<label for="${inputId}">${escapeHtml(definition.name||type)}上限</label><input id="${inputId}" data-player="${player}" data-unit-type="${type}" type="number" min="0" max="999" value="${Number(defaults[type])||0}">`;
+      container.appendChild(field);
+    };
+    makeField('attacker',attacker); makeField('defender',defender);
+  }
+  const defaults=variant?.defaults;
+  if(defaults?.reinforcement!=null) document.getElementById('reinforcement').value=defaults.reinforcement;
+  const aiBox=document.getElementById('playAgainstAi');
+  aiBox.disabled=variant?.supportsAi!==true;
+  if(aiBox.disabled){aiBox.checked=false;document.getElementById('botOptions').classList.add('hidden');gameMode='pvp';}
+}
+
 function createRoom(){
-  send('create',{hostRole,gameMode,botDifficulty:document.getElementById('botDifficulty').value,config:{
-    reinforcement:val('reinforcement'),
-    attackerInfantry:val('aInf'),attackerAntiTank:val('aAT'),attackerMachineGun:val('aMG'),
-    defenderInfantry:val('dInf'),defenderAntiTank:val('dAT'),
+  const variantId=document.getElementById('variantId').value||selectedVariantId;
+  const variant=currentVariant();
+  if(!variantId||!variant){showGameModal('服务器尚未提供可用玩法。','提示');return;}
+  gameMode=document.getElementById('playAgainstAi').checked?'ai':'pvp';
+  const maxUnits={attacker:{},defender:{}};
+  document.querySelectorAll('[data-player][data-unit-type]').forEach(input=>{maxUnits[input.dataset.player][input.dataset.unitType]=val(input.id);});
+  send('create',{hostRole,gameMode,variantId,botDifficulty:document.getElementById('botDifficulty').value,config:{
+    reinforcement:val('reinforcement'), maxUnits,
     allowDeployAfterAction:document.getElementById('allowDeployAfterAction').checked
   }});
 }
@@ -511,6 +637,7 @@ function setVolumeFromUI(){
   document.getElementById('bgmVolumeValue').textContent=Math.round(AUDIO.bgmVolume*100)+'%';
   document.getElementById('sfxVolumeValue').textContent=Math.round(AUDIO.sfxVolume*100)+'%';
   if(AUDIO.bgm) AUDIO.bgm.volume=AUDIO.bgmVolume;
+  if(AUDIO.end) AUDIO.end.volume=AUDIO.bgmVolume;
 }
 function useCustomBgm(event){
   const file=event.target.files?.[0];
@@ -563,13 +690,16 @@ function sendChat(){
 function getUnit(id){return state?.units.find(u=>u.id===id) || null;}
 function myUnit(id){return state?.myUnits.find(u=>u.id===id) || null;}
 function unitAt(r,c){return state?.units.find(u=>u.row===r&&u.col===c) || null;}
-function terrain(r,c){if(r===2&&(c===1||c===3))return 1;if(r===3&&[0,1,3,4].includes(c))return 2;return 0;}
-function dispCol(r,c){return r===5?(c+0.5).toFixed(1):String(c+1);}
+function cellKey(r,c){return `${r},${c}`;}
+function getCellDefinition(r,c){return boardLayout?.rows.flatMap(row=>row.cells.map(cell=>({row:row.id,...cell}))).find(cell=>cell.row===r&&cell.col===c) || null;}
+function terrain(r,c){return getCellDefinition(r,c)?.terrain || null;}
+function dispCol(r,c){return getCellDefinition(r,c)?.displayCol ?? String(c+1);}
 
 function statusBadge(text,kind){return `<span class="badge ${kind||''}">${text}</span>`;}
 
 function statusHtml(u){
-  const moveText = u.type==='machineGun' ? `移${u.moveSteps||0}/2` : (u.moved?'已移':'未移');
+  const maxMove=unitRule(u.type)?.maxMoveSteps;
+  const moveText = maxMove && maxMove>1 ? `移${u.moveSteps||0}/${maxMove}` : (u.moved?'已移':'未移');
   const shotText = u.shot ? '已攻' : '未攻';
   const hitText = u.hits>0 ? `受击${u.hits}` : '未受击';
   let s = '';
@@ -585,8 +715,8 @@ function cellCenter(row,col){
   const el=document.querySelector(`.cell[data-r="${row}"][data-c="${col}"]`);
   const board=document.querySelector('.board');
   if(!el||!board) return null;
-  // Always return coordinates in the board's own 790x720 layout space.
-  // This avoids double-scaling when the board is transformed on mobile.
+  // Coordinates stay in the server-provided board layout space. This avoids
+  // double-scaling when the board is transformed on mobile.
   let x=el.offsetLeft + el.offsetWidth/2;
   let y=el.offsetTop + el.offsetHeight/2;
   let n=el.offsetParent;
@@ -606,13 +736,13 @@ function clearFxLayer(){
 
 function ensureFxSvg(){
   const layer=document.getElementById('fxLayer');
-  if(!layer) return null;
+  if(!layer||!boardLayout) return null;
   let svg=document.getElementById('fxSvg');
   if(!svg){
     svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
     svg.id='fxSvg';
     svg.classList.add('fx-svg');
-    svg.setAttribute('viewBox','0 0 790 720');
+    svg.setAttribute('viewBox',`0 0 ${boardLayout.width} ${boardLayout.height}`);
     svg.setAttribute('preserveAspectRatio','none');
     layer.appendChild(svg);
   }
@@ -729,7 +859,7 @@ function startTransientEvent(ev){
       corpse.style.top=`${pos.y+18}px`;
       const label=document.createElement('div');
       label.className='corpse-label';
-      label.textContent=du ? `${du.player==='attacker'?'进攻':'防守'}·${TYPE[du.type].name} #${du.id}` : '尸体';
+      label.textContent=du ? `${du.player==='attacker'?'进攻':'防守'}·${unitRule(du.type)?.name||du.type} #${du.id}` : '尸体';
       corpse.appendChild(label);
       document.getElementById('fxLayer').appendChild(corpse);
       activeCorpse={row:ev.targetPos.row,col:ev.targetPos.col,_el:corpse};
@@ -749,11 +879,17 @@ function startTransientEvent(ev){
 }
 
 function createUnitIcon(type){
-  const iconName = type==='infantry' ? 'infantry' : type==='antiTank' ? 'anti-tank' : 'machine-gun';
-  const fallback = TYPE[type]?.short || '?';
+  const rule=unitRule(type);
+  const fallback = rule?.short || '?';
+  if(!rule?.icon){
+    const span=document.createElement('span');
+    span.className='unit-icon-fallback';
+    span.textContent=fallback;
+    return span;
+  }
   const img = document.createElement('img');
   img.className='unit-svg external-unit-icon';
-  img.src=`/icons/${iconName}.svg`;
+  img.src=rule.icon;
   img.alt='';
   img.draggable=false;
   img.addEventListener('error',()=>{
@@ -765,15 +901,168 @@ function createUnitIcon(type){
   return img;
 }
 
-function createCell(r,c){
+function boundedNumber(value,min,max,fallback){
+  const number=Number(value);
+  return Number.isFinite(number)?Math.max(min,Math.min(max,number)):fallback;
+}
+
+function normalizeBoard(raw){
+  const source=raw&&typeof raw==='object'?raw:null;
+  if(!source) return null;
+  const sourceRows=Array.isArray(source.rows)?source.rows:[];
+  const seenRows=new Set();
+  const rows=[];
+  for(const rawRow of sourceRows.slice(0,30)){
+    const id=Number(rawRow?.id);
+    if(!Number.isInteger(id)||seenRows.has(id)||!Array.isArray(rawRow.cells)) continue;
+    const seenCols=new Set();
+    const cells=[];
+    for(const rawCell of rawRow.cells.slice(0,50)){
+      const col=Number(rawCell?.col);
+      if(!Number.isInteger(col)||seenCols.has(col)) continue;
+      const terrain=String(rawCell?.terrain||'').slice(0,48);
+      if(!terrain) continue;
+      cells.push({col,displayCol:String(rawCell.displayCol??col+1).slice(0,12),terrain});
+      seenCols.add(col);
+    }
+    if(!cells.length) continue;
+    rows.push({id,top:boundedNumber(rawRow.top,0,4000,rows.length*108),cells});
+    seenRows.add(id);
+  }
+  if(!rows.length) return null;
+  const inset=source.gridInset||{};
+  const cellSize=source.cellSize||{};
+  const deploymentRows=source.deploymentRows||{};
+  const connections=Array.isArray(source.connections)?source.connections.slice(0,5000).flatMap(connection=>{
+    const from=connection?.from, to=connection?.to;
+    const fromRow=Number(from?.row), fromCol=Number(from?.col), toRow=Number(to?.row), toCol=Number(to?.col);
+    if(![fromRow,fromCol,toRow,toCol].every(Number.isInteger)) return [];
+    return [{from:{row:fromRow,col:fromCol},to:{row:toRow,col:toCol},type:String(connection.type||'adjacent').slice(0,32),style:connection.style&&typeof connection.style==='object'?connection.style:null}];
+  }):[];
+  return {
+    id:String(source.id||'').slice(0,64),name:String(source.name||'棋盘').slice(0,80),
+    width:boundedNumber(source.width,320,2400,790),height:boundedNumber(source.height,320,4000,720),
+    gridInset:{top:boundedNumber(inset.top,0,500,48),right:boundedNumber(inset.right,0,500,38),bottom:boundedNumber(inset.bottom,0,500,24),left:boundedNumber(inset.left,0,500,38)},
+    cellSize:{width:boundedNumber(cellSize.width,44,300,116),height:boundedNumber(cellSize.height,44,240,90)},
+    gap:boundedNumber(source.gap,0,80,12),
+    deploymentRows:{
+      attacker:Number.isInteger(Number(deploymentRows.attacker))?Number(deploymentRows.attacker):null,
+      defender:Number.isInteger(Number(deploymentRows.defender))?Number(deploymentRows.defender):null
+    },
+    connections,
+    rows
+  };
+}
+
+function resetBoardLayout(){
+  boardLayoutSignature='';
+  boardLayout=null;
+  cellElements.clear();
+  const board=document.getElementById('board');
+  board?.style.setProperty('--board-width','0px');
+  board?.style.setProperty('--board-height','0px');
+  document.getElementById('boardGrid')?.replaceChildren();
+  document.getElementById('mapConnections')?.replaceChildren();
+  clearFxLayer();
+}
+
+function ensureBoardLayout(){
+  const next=normalizeBoard(state?.board);
+  if(!next){
+    if(boardLayoutSignature!=='__invalid__'){
+      boardLayoutSignature='__invalid__';
+      boardLayout=null;
+      cellElements.clear();
+      const board=document.getElementById('board');
+      board?.style.setProperty('--board-width','0px');
+      board?.style.setProperty('--board-height','0px');
+      document.getElementById('boardGrid')?.replaceChildren();
+      document.getElementById('mapConnections')?.replaceChildren();
+      clearFxLayer();
+    }
+    return false;
+  }
+  const signature=JSON.stringify(next);
+  if(signature===boardLayoutSignature) return true;
+  boardLayout=next;
+  boardLayoutSignature=signature;
+  cellElements.clear();
+  clearFxLayer();
+
+  const board=document.getElementById('board');
+  const boardArea=document.querySelector('.board-area');
+  const grid=document.getElementById('boardGrid');
+  boardArea.style.setProperty('--board-width',`${next.width}px`);
+  boardArea.style.setProperty('--board-height',`${next.height}px`);
+  board.style.setProperty('--board-width',`${next.width}px`);
+  board.style.setProperty('--board-height',`${next.height}px`);
+  board.style.setProperty('--grid-top',`${next.gridInset.top}px`);
+  board.style.setProperty('--grid-right',`${next.gridInset.right}px`);
+  board.style.setProperty('--grid-bottom',`${next.gridInset.bottom}px`);
+  board.style.setProperty('--grid-left',`${next.gridInset.left}px`);
+  board.style.setProperty('--cell-width',`${next.cellSize.width}px`);
+  board.style.setProperty('--cell-height',`${next.cellSize.height}px`);
+  board.style.setProperty('--cell-gap',`${next.gap}px`);
+  const fragment=document.createDocumentFragment();
+  for(const row of next.rows){
+    const rowEl=document.createElement('div');
+    rowEl.className='row';
+    rowEl.dataset.row=String(row.id);
+    rowEl.style.top=`${row.top}px`;
+    for(const cell of row.cells) rowEl.appendChild(createCell(row,cell));
+    fragment.appendChild(rowEl);
+  }
+  grid.replaceChildren(fragment);
+  renderMapConnections();
+  updateMobileLayout();
+  return true;
+}
+
+function renderMapConnections(){
+  const svg=document.getElementById('mapConnections');
+  if(!svg||!boardLayout) return;
+  svg.replaceChildren();
+  svg.setAttribute('viewBox',`0 0 ${boardLayout.width} ${boardLayout.height}`);
+  const NS='http://www.w3.org/2000/svg';
+  for(const edge of boardLayout.connections||[]){
+    const from=cellCenter(edge.from.row,edge.from.col);
+    const to=cellCenter(edge.to.row,edge.to.col);
+    if(!from||!to) continue;
+    const line=document.createElementNS(NS,'line');
+    line.setAttribute('x1',from.x); line.setAttribute('y1',from.y);
+    line.setAttribute('x2',to.x); line.setAttribute('y2',to.y);
+    line.setAttribute('stroke',edge.style?.stroke||'#3d526b');
+    line.setAttribute('stroke-width',edge.style?.width||3);
+    line.setAttribute('stroke-linecap','round');
+    line.setAttribute('opacity',edge.style?.opacity ?? 0.48);
+    svg.appendChild(line);
+  }
+}
+
+function createCell(row,cell){
+  const r=row.id,c=cell.col;
   const el=document.createElement('div');
-  const t=terrain(r,c);
-  el.className='cell'+(t===1?' fort':'')+(t===2?' stairs':'');
+  const rule=terrainRule(cell.terrain);
+  const terrainId=String(cell.terrain||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown';
+  el.className=`cell terrain-${terrainId}`;
+  if(rule?.color) el.style.setProperty('--terrain-background',rule.color);
+  if(rule?.borderColor) el.style.setProperty('--terrain-border',rule.borderColor);
   el.dataset.r=r;el.dataset.c=c;el.onclick=()=>clickCell(r,c);
-  const tn=document.createElement('div');tn.className='terrain';tn.textContent=t===1?'堡垒':t===2?'楼梯':'普通';el.appendChild(tn);
-  const co=document.createElement('div');co.className='coord';co.textContent=`(${r},${dispCol(r,c)})`;el.appendChild(co);
-  if(t){const s=document.createElement('div');s.className='symbol';s.textContent=t===1?'▦':'⇧';el.appendChild(s);}
-  const ev=activeFxEvent || state.lastEvent;
+  const tn=document.createElement('div');tn.className='terrain';tn.textContent=rule?.name||cell.terrain||'未知地块';el.appendChild(tn);
+  const co=document.createElement('div');co.className='coord';co.textContent=`(${r},${cell.displayCol})`;el.appendChild(co);
+  if(rule?.symbol){const s=document.createElement('div');s.className='symbol';s.textContent=rule.symbol;el.appendChild(s);}
+  cellElements.set(cellKey(r,c),el);
+  return el;
+}
+
+function updateCell(el,r,c){
+  const terrainId=terrain(r,c);
+  const rule=terrainRule(terrainId);
+  const safeTerrainId=String(terrainId||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown';
+  el.className=`cell terrain-${safeTerrainId}`;
+  if(rule?.color) el.style.setProperty('--terrain-background',rule.color);
+  if(rule?.borderColor) el.style.setProperty('--terrain-border',rule.borderColor);
+  el.querySelector('.unit')?.remove();
   const u=unitAt(r,c);
   if(u){
     const ue=document.createElement('div');
@@ -793,31 +1082,31 @@ function createCell(r,c){
     mini.innerHTML=statusBadge(u.moved?'✓':'·',u.moved?'yes':'no')+statusBadge(u.shot?'★':'·',u.shot?'yes':'no')+(u.hits>0?statusBadge(String(u.hits),'hit'):'');
     ue.appendChild(mini);el.appendChild(ue);
   }
-  return el;
 }
 
 function renderBoard(){
-  for(let r=1;r<=6;r++){
-    const box=document.getElementById('r'+r);box.innerHTML='';
-    const cols=r===5?[1,2,3,4]:[0,1,2,3,4];
-    cols.forEach(c=>box.appendChild(createCell(r,c)));
+  if(!state) return;
+  if(!ensureBoardLayout()) return;
+  for(const [key,el] of cellElements){
+    const [r,c]=key.split(',').map(Number);
+    updateCell(el,r,c);
   }
 
   const u=myUnit(selectedId);
   if(!u || u.player!==role || state.currentPlayer!==role){ renderTransientFx(); return; }
   const legalMoves=new Map((u.legalMoves||[]).map(x=>[`${x.row},${x.col}`,x]));
   const legalShots=new Set(u.legalShots||[]);
-  document.querySelectorAll('.cell').forEach(e=>{
+  cellElements.forEach(e=>{
     const r=Number(e.dataset.r),c=Number(e.dataset.c),t=unitAt(r,c),k=`${r},${c}`;
     if(legalMoves.has(k)) e.classList.add('move');
     if(t && legalShots.has(t.id)) e.classList.add('shoot');
   });
 
   if(deployType){
-    const targetRow=role==='attacker'?6:1;
-    document.querySelectorAll(`.cell[data-r="${targetRow}"]`).forEach(e=>{
+    const targetRow=boardLayout.deploymentRows?.[role];
+    cellElements.forEach(e=>{
       const r=Number(e.dataset.r),c=Number(e.dataset.c);
-      if(!unitAt(r,c)) e.classList.add('deployable');
+      if(r===targetRow&&!unitAt(r,c)) e.classList.add('deployable');
     });
   }
   renderTransientFx();
@@ -840,11 +1129,14 @@ function endTurn(){selectedId=null;deployType=null;send('endTurn');render();}
 function toggleLog(){logCollapsed=!logCollapsed;document.getElementById('log').classList.toggle('collapsed',logCollapsed);document.getElementById('logArrow').textContent=logCollapsed?'▶':'▼';}
 
 function configSummary(){
-  const c=state.config;return `规则：增援 ${c.reinforcement} · 进攻 步${c.attackerMax.infantry}/炮${c.attackerMax.antiTank}/机${c.attackerMax.machineGun} · 防守 步${c.defenderMax.infantry}/炮${c.defenderMax.antiTank} · 行动后部署：${c.allowDeployAfterAction?'允许':'禁止'}`;
+  const c=state.config;
+  const limits=max=>Object.entries(max||{}).map(([type,count])=>`${unitRule(type)?.short||unitRule(type)?.name||type}${count}`).join('/');
+  return `规则：增援 ${c.reinforcement} · 进攻 ${limits(c.attackerMax)} · 防守 ${limits(c.defenderMax)} · 行动后部署：${c.allowDeployAfterAction?'允许':'禁止'}`;
 }
 
 function render(){
   if(!state)return;
+  ensureBoardLayout();
   document.getElementById('chatOverlay').classList.toggle('hidden', !state.started || state.state!=='playing');
   const turnChanged = previousTurnPlayer !== null && previousTurnPlayer !== state.currentPlayer;
   const firstPlayableTurn = !previousStarted && state.started && state.state === 'playing';
@@ -855,25 +1147,28 @@ function render(){
   }
   previousTurnPlayer = state.currentPlayer;
   previousStarted = !!state.started;
-  document.getElementById('rolePill').textContent=role==='attacker'?'你是进攻方':role==='defender'?'你是防守方':'观战中';
+  document.getElementById('rolePill').textContent=role==='attacker'?`你是${playerName('attacker')}`:role==='defender'?`你是${playerName('defender')}`:'观战中';
   document.getElementById('rolePill').className='pill '+(role==='attacker'?'mine':role==='defender'?'enemy':'good');
-  document.getElementById('turnPill').textContent=`当前：${state.currentPlayer==='attacker'?'进攻方':'防守方'}`;
+  document.getElementById('turnPill').textContent=`当前：${playerName(state.currentPlayer)}`;
   document.getElementById('turnPill').className='pill '+(state.currentPlayer===role?'good':'');
   document.getElementById('round').textContent=state.round;
   document.getElementById('reinforce').textContent=state.attackerReinforcement;
-  document.getElementById('roomText').innerHTML=state?.roomName?`<strong>${escapeHtml(state.roomName)}</strong> · ${state.gameMode==='ai'?`人机对战（${botDifficultyName(state.botDifficulty)}）`:'玩家对战'} · ${state.roomPlayerCount}/2 · ${role==='spectator'?'观战中':`你是${role==='attacker'?'进攻方':'防守方'}`}${state.botRole?` · 机器人是${state.botRole==='attacker'?'进攻方':'防守方'}`:''}${!state.started?' · 等待另一名玩家加入':''}`:'尚未加入房间。';
+  document.getElementById('roomText').innerHTML=state?.roomName?`<strong>${escapeHtml(state.roomName)}</strong> · ${escapeHtml(state.variant?.name||state.variantId||'未知模式')} · ${state.gameMode==='ai'?`人机对战（${botDifficultyName(state.botDifficulty)}）`:'玩家对战'} · ${state.roomPlayerCount}/2 · ${role==='spectator'?'观战中':`你是${playerName(role)}`}${state.botRole?` · 机器人是${playerName(state.botRole)}`:''}${!state.started?' · 等待另一名玩家加入':''}`:'尚未加入房间。';
   document.getElementById('configText').textContent=state.config?configSummary():'';
-  document.getElementById('deployHint').textContent=state.currentPlayer!==role?'等待对方回合。':`可部署在第${role==='attacker'?6:1}行；${role==='attacker'?`剩余增援 ${state.attackerReinforcement}`:'不消耗增援'}；行动后部署${state.config.allowDeployAfterAction?'已开启':'未开启'}。`;
+  const deployRow=boardLayout.deploymentRows?.[role]??(role==='attacker'?6:1);
+  document.getElementById('deployHint').textContent=state.currentPlayer!==role?'等待对方回合。':`可部署在第${deployRow}行；${role==='attacker'?`剩余增援 ${state.attackerReinforcement}`:'不消耗增援'}；行动后部署${state.config.allowDeployAfterAction?'已开启':'未开启'}。`;
   const canOperate=state.started&&state.state==='playing'&&(role==='attacker'||role==='defender')&&state.currentPlayer===role;
   document.getElementById('endTurnBtn').disabled=!canOperate;
   const surrenderBtn=document.getElementById('surrenderBtn'); if(surrenderBtn){ surrenderBtn.disabled=!canOperate; if(!canOperate){surrenderBtn.textContent='投降'; surrenderCount=0;} }
   const leaveRoomBtn=document.getElementById('leaveRoomBtn'); if(leaveRoomBtn) leaveRoomBtn.disabled=!roomId;
+  document.getElementById('cancelSelectionBtn').disabled=!canOperate;
+  document.getElementById('chatInput').disabled=state.state!=='playing';
+  document.getElementById('chatSend').disabled=state.state!=='playing';
 
   document.querySelectorAll('.unit-buttons button').forEach(b=>b.disabled=!canOperate);
-  if(role==='defender') document.getElementById('bMG').disabled=true;
   if(role==='attacker' && state.attackerReinforcement<=0) document.querySelectorAll('.unit-buttons button').forEach(b=>b.disabled=true);
   document.querySelectorAll('.unit-buttons button').forEach(b=>b.classList.remove('active'));
-  if(deployType) document.getElementById(deployType==='infantry'?'bInf':deployType==='antiTank'?'bAT':'bMG').classList.add('active');
+  if(deployType) document.querySelectorAll('#unitButtons button').forEach(button=>{if(button.dataset.type===deployType) button.classList.add('active');});
 
   document.getElementById('log').innerHTML=(state.log||[]).map(x=>`<div>${escapeHtml(x)}</div>`).join('');
   document.getElementById('log').scrollTop=999999;
@@ -887,14 +1182,9 @@ function render(){
 
   if(state.state==='ended'){
     const banner=document.getElementById('resultBanner');
-    const winnerText=state.winner==='attacker'?'进攻方获胜':'防守方获胜';
-    const reasonText={
-      attacker_reached_first_row:'进攻方战棋到达第一行。',
-      attacker_eliminated:'进攻方增援耗尽且场上已无存活战棋。',
-      surrender:`${state.winner==='attacker'?'防守方':'进攻方'}投降。`,
-      disconnect:`${state.winner==='attacker'?'防守方':'进攻方'}断开连接。`,
-      leave_room:`${state.winner==='attacker'?'防守方':'进攻方'}退出房间。`
-    }[state.winnerReason] || '对局已结束。';
+    const winnerText=`${playerName(state.winner)}获胜`;
+    const messages=ruleDefinitions?.victory?.messages||{};
+    const reasonText=messages[state.winnerReason] || '对局已结束。';
     document.getElementById('resultBannerTitle').textContent=winnerText;
     document.getElementById('resultBannerDetail').textContent=reasonText;
     banner.classList.remove('hidden','win-attacker','win-defender');
@@ -908,7 +1198,7 @@ function showTurnStart(player){
   const overlay=document.getElementById('turnStartOverlay');
   const name=document.getElementById('turnStartName');
   if(!overlay||!name)return;
-  name.textContent=player==='attacker'?'进攻方':'防守方';
+  name.textContent=playerName(player);
   overlay.classList.remove('show');
   void overlay.offsetWidth;
   overlay.classList.add('show');
@@ -927,17 +1217,27 @@ loadAudioManifest();
 /* 手机端棋盘自适应：只改变显示缩放，不改变坐标和游戏逻辑。 */
 function updateMobileLayout(){
   const boardArea=document.querySelector('.board-area');
-  if(!boardArea) return;
+  const board=document.getElementById('board');
+  if(!boardArea||!board) return;
+  if(!boardLayout){
+    document.documentElement.style.removeProperty('--mobile-board-scale');
+    boardArea.style.height='0px';
+    return;
+  }
   const isMobile=window.matchMedia('(max-width:700px)').matches;
   if(!isMobile){
     document.documentElement.style.removeProperty('--mobile-board-scale');
     boardArea.style.removeProperty('height');
+    board.style.removeProperty('margin-bottom');
     return;
   }
+  const boardWidth=boardLayout.width;
+  const boardHeight=boardLayout.height;
   const available=Math.max(280, window.innerWidth-8);
-  const scale=Math.min(1, available/790);
+  const scale=Math.min(1, available/boardWidth);
   document.documentElement.style.setProperty('--mobile-board-scale', String(scale));
-  boardArea.style.height=`${Math.ceil(724*scale+92)}px`;
+  board.style.marginBottom=`-${Math.ceil(boardHeight*(1-scale))}px`;
+  boardArea.style.height=`${Math.ceil(boardHeight*scale+(state?.state==='ended'?100:12))}px`;
 }
 window.addEventListener('resize',updateMobileLayout,{passive:true});
 window.addEventListener('orientationchange',()=>setTimeout(updateMobileLayout,120),{passive:true});

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": "classic",
+  "version": 1,
+  "terrain": {
+    "plain": {
+      "name": "普通",
+      "passableUnits": ["infantry", "antiTank", "machineGun"],
+      "color": "#222a35",
+      "borderColor": "#394555",
+      "symbol": ""
+    },
+    "fortress": {
+      "name": "堡垒",
+      "passableUnits": ["infantry", "antiTank"],
+      "color": "#4c3924",
+      "borderColor": "#a98042",
+      "symbol": "▦",
+      "attackImmuneFrom": ["infantry", "machineGun"]
+    },
+    "stairs": {
+      "name": "楼梯",
+      "passableUnits": ["infantry"],
+      "color": "#30375a",
+      "borderColor": "#777fc2",
+      "symbol": "⇧",
+      "specialEntry": { "unitType": "infantry", "fromRow": 4, "toRow": 3, "requiresShotTarget": true }
+    }
+  },
+  "combat": {
+    "hitsToDestroy": 2,
+    "instantKill": {
+      "attackerTypes": ["antiTank"],
+      "targetTypes": ["machineGun"],
+      "terrainTypes": ["fortress"]
+    }
+  },
+  "configDefaults": { "reinforcement": 28, "allowDeployAfterAction": true },
+  "victory": { "attackerTargetRow": 1, "messages": {
+    "attacker_reached_first_row": "进攻方战棋到达第一行。",
+    "attacker_eliminated": "进攻方增援耗尽且场上已无存活战棋。",
+    "surrender": "对手投降。", "disconnect": "对手断开连接。", "leave_room": "对手退出房间。"
+  } },
+  "ai": {
+    "terrainScores": { "fortress": 38, "stairs": 20 },
+    "targetRowScores": { "2": 360, "3": 150 },
+    "defenderRowScore": { "2": 24 },
+    "roleBonuses": { "antiTankVsMachineGun": 150, "antiTankVsFortress": 120, "machineGunWithoutAntiTank": 25 }
+  },
+  "turn": {
+    "machineGunMaxMoveSteps": 2,
+    "allowDeployAfterActionConfigurable": true
+  }
+}

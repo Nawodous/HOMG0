@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "classic",
+  "units": {
+    "infantry": {
+      "name": "步兵",
+      "short": "步",
+      "move": 1,
+      "range": 2,
+      "maxMoveSteps": 1,
+      "actionRules": { "canMoveAfterShot": true, "canShootAfterMove": true, "endWhen": "movedAndShot" },
+      "allowedPlayers": ["attacker", "defender"],
+      "icon": "/icons/infantry.svg",
+      "immuneFrom": [],
+      "deployLimit": { "attacker": 5, "defender": 4 },
+      "ai": { "role": "infantry", "value": 45 }
+    },
+    "antiTank": {
+      "name": "反坦克炮",
+      "short": "炮",
+      "move": 1,
+      "range": 3,
+      "maxMoveSteps": 1,
+      "actionRules": { "canMoveAfterShot": false, "canShootAfterMove": false, "endWhen": "movedOrShot" },
+      "allowedPlayers": ["attacker", "defender"],
+      "icon": "/icons/anti-tank.svg",
+      "immuneFrom": [],
+      "deployLimit": { "attacker": 1, "defender": 1 },
+      "ai": { "role": "antiTank", "value": 85 }
+    },
+    "machineGun": {
+      "name": "机枪车",
+      "short": "机",
+      "move": 2,
+      "range": 2,
+      "maxMoveSteps": 2,
+      "actionRules": { "canMoveAfterShot": true, "canShootAfterMove": true, "endWhen": "maxMoveStepsAndShot" },
+      "allowedPlayers": ["attacker"],
+      "icon": "/icons/machine-gun.svg",
+      "immuneFrom": ["infantry", "machineGun"],
+      "deployLimit": { "attacker": 1, "defender": 0 },
+      "ai": { "role": "machineGun", "value": 70 }
+    }
+  }
+}

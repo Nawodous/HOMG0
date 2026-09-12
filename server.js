@@ -10,6 +10,143 @@ const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.webm
 const AUDIO_ROOT = path.resolve(PUBLIC_DIR, 'audio');
 const BOT_STEP_DELAY = 550;
 const BOT_MAX_STEPS_PER_TURN = 100;
+const DATA_ROOT = path.join(__dirname, 'data');
+
+function serializeDefinition(value) {
+  return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function deserializeDefinition(serialized, label = 'definition') {
+  if (serialized && typeof serialized === 'object') return serialized;
+  if (typeof serialized !== 'string') throw new Error(`${label} must be JSON text or an object`);
+  try {
+    const value = JSON.parse(serialized);
+    if (!value || typeof value !== 'object') throw new Error('root must be an object or array');
+    return value;
+  } catch (err) {
+    throw new Error(`Invalid serialized ${label}: ${err.message}`);
+  }
+}
+
+function loadSerializedDefinition(relativePath) {
+  const filePath = safeDataPath(relativePath);
+  const text = fs.readFileSync(filePath, 'utf8');
+  return deserializeDefinition(text, relativePath);
+}
+
+function freezeDefinition(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value)) freezeDefinition(child);
+  return Object.freeze(value);
+}
+
+function parseCoordinate(value) {
+  if (typeof value === 'string') {
+    const [row, col] = value.split(',').map(Number);
+    if (Number.isInteger(row) && Number.isInteger(col)) return { row, col };
+  }
+  if (value && typeof value === 'object') {
+    const row = Number(value.row), col = Number(value.col);
+    if (Number.isInteger(row) && Number.isInteger(col)) return { row, col };
+  }
+  return null;
+}
+
+function normalizeBoardDefinition(raw) {
+  const board = deserializeDefinition(raw, 'board');
+  if (!Array.isArray(board.rows) || !board.rows.length) throw new Error('board.rows must be a non-empty array');
+  const rows = board.rows.map(row => ({
+    id: Number(row.id),
+    top: Number(row.top) || 0,
+    cells: Array.isArray(row.cells) ? row.cells.map(cell => ({
+      col: Number(cell.col),
+      displayCol: String(cell.displayCol ?? Number(cell.col) + 1),
+      terrain: String(cell.terrain || '')
+    })).filter(cell => Number.isInteger(cell.col)) : []
+  })).filter(row => Number.isInteger(row.id) && row.cells.length);
+  if (!rows.length) throw new Error('board.rows contains no valid rows');
+
+  const edges = [];
+  const seenEdges = new Set();
+  const addEdge = (fromValue, toValue, type = 'adjacent', style = null) => {
+    const from = parseCoordinate(fromValue), to = parseCoordinate(toValue);
+    if (!from || !to || (from.row === to.row && from.col === to.col)) return;
+    const left = `${from.row},${from.col}`, right = `${to.row},${to.col}`;
+    const edgeId = [left, right].sort().join('|');
+    if (seenEdges.has(edgeId)) return;
+    seenEdges.add(edgeId);
+    edges.push({ from, to, type: String(type || 'adjacent').slice(0, 32), style: style && typeof style === 'object' ? { ...style } : null });
+  };
+  if (Array.isArray(board.connections)) {
+    for (const edge of board.connections) addEdge(edge?.from, edge?.to, edge?.type, edge?.style);
+  } else if (board.connections && typeof board.connections === 'object') {
+    for (const [from, targets] of Object.entries(board.connections)) {
+      if (!Array.isArray(targets)) continue;
+      for (const target of targets) addEdge(from, target);
+    }
+  }
+  return freezeDefinition({
+    schemaVersion: Number(board.schemaVersion) || 1,
+    id: String(board.id || 'classic'),
+    name: String(board.name || board.id || '棋盘'),
+    width: Number(board.width) || 790,
+    height: Number(board.height) || 720,
+    gridInset: board.gridInset || {},
+    cellSize: board.cellSize || {},
+    gap: Number(board.gap) || 0,
+    deploymentRows: board.deploymentRows || {},
+    rows,
+    connections: edges
+  });
+}
+
+function normalizeUnitsDefinition(raw) {
+  const source = deserializeDefinition(raw, 'units');
+  const units = source.units && typeof source.units === 'object' ? source.units : source;
+  const out = {};
+  for (const [id, value] of Object.entries(units)) {
+    if (!/^[a-zA-Z0-9_-]{1,48}$/.test(id) || !value || typeof value !== 'object') continue;
+    out[id] = {
+      name: String(value.name || id), short: String(value.short || '?'),
+      move: Number(value.move) || 1, range: Number(value.range) || 1,
+      maxMoveSteps: Number(value.maxMoveSteps) || Number(value.move) || 1,
+      icon: String(value.icon || ''),
+      immuneFrom: Array.isArray(value.immuneFrom) ? value.immuneFrom.map(String) : [],
+      allowedPlayers: Array.isArray(value.allowedPlayers) ? value.allowedPlayers.map(String) : ['attacker', 'defender'],
+      actionRules: value.actionRules && typeof value.actionRules === 'object' ? { ...value.actionRules } : {},
+      deployLimit: value.deployLimit && typeof value.deployLimit === 'object' ? { ...value.deployLimit } : {},
+      ai: value.ai && typeof value.ai === 'object' ? { ...value.ai } : {}
+    };
+  }
+  if (!Object.keys(out).length) throw new Error('units contains no valid unit definitions');
+  return freezeDefinition(out);
+}
+
+function normalizeRulesDefinition(raw, units) {
+  const source = deserializeDefinition(raw, 'rules');
+  const terrain = source.terrain && typeof source.terrain === 'object' ? source.terrain : {};
+  const normalizedTerrain = {};
+  for (const [id, value] of Object.entries(terrain)) {
+    if (!/^[a-zA-Z0-9_-]{1,48}$/.test(id) || !value || typeof value !== 'object') continue;
+    normalizedTerrain[id] = {
+      name: String(value.name || id),
+      passableUnits: Array.isArray(value.passableUnits) ? value.passableUnits.map(String).filter(type => units[type]) : [],
+      color: String(value.color || ''), borderColor: String(value.borderColor || ''), symbol: String(value.symbol || ''),
+      attackImmuneFrom: Array.isArray(value.attackImmuneFrom) ? value.attackImmuneFrom.map(String).filter(type => units[type]) : [],
+      specialEntry: value.specialEntry && typeof value.specialEntry === 'object'
+        ? JSON.parse(JSON.stringify(value.specialEntry))
+        : (value.specialEntry ? String(value.specialEntry) : null)
+    };
+  }
+  if (!Object.keys(normalizedTerrain).length) throw new Error('rules.terrain contains no valid terrain definitions');
+  return freezeDefinition({
+    schemaVersion: Number(source.schemaVersion) || 1,
+    id: String(source.id || 'classic'), version: Number(source.version) || 1,
+    units, terrain: normalizedTerrain,
+    combat: source.combat || {}, turn: source.turn || {}, victory: source.victory || {},
+    configDefaults: source.configDefaults || {}, ai: source.ai || {}, ui: source.ui || {}
+  });
+}
 
 function collectAudioFiles(dir, prefix = '') {
   let entries;
@@ -37,18 +174,105 @@ function collectAudioFiles(dir, prefix = '') {
 }
 
 
-const DEFAULT_CONFIG = {
+const FALLBACK_CONFIG = {
   reinforcement: 28,
   attackerMax: { infantry: 5, antiTank: 1, machineGun: 1 },
   defenderMax: { infantry: 4, antiTank: 1, machineGun: 0 },
-  allowDeployAfterAction: false
+  allowDeployAfterAction: true
 };
 
-const TYPES = {
-  infantry: { name: '步兵', short: '步', move: 1, range: 2 },
-  antiTank: { name: '反坦克炮', short: '炮', move: 1, range: 3 },
-  machineGun: { name: '机枪车', short: '机', move: 2, range: 2 }
-};
+function safeDataPath(relativePath) {
+  const value = String(relativePath || '').replace(/\\/g, '/');
+  const full = path.resolve(DATA_ROOT, value);
+  if (full !== DATA_ROOT && !full.startsWith(DATA_ROOT + path.sep)) throw new Error('definition path escapes data directory');
+  return full;
+}
+
+function normalizeVariantCatalog(raw) {
+  const source = deserializeDefinition(raw, 'variants');
+  const entries = source.variants && typeof source.variants === 'object' ? source.variants : source;
+  const out = {};
+  for (const [id, value] of Object.entries(entries)) {
+    if (!/^[a-zA-Z0-9_-]{1,48}$/.test(id) || !value || typeof value !== 'object') continue;
+    if (!value.board || !value.units || !value.rules) continue;
+    out[id] = {
+      id, name: String(value.name || id), category: String(value.category || 'battle'),
+      enabled: value.enabled !== false, engine: String(value.engine || id),
+      supportsAi: value.supportsAi === true,
+      boardPath: String(value.board), unitsPath: String(value.units), rulesPath: String(value.rules)
+    };
+  }
+  if (!Object.keys(out).length) throw new Error('variants contains no valid entries');
+  return freezeDefinition(out);
+}
+
+const VARIANT_CATALOG = normalizeVariantCatalog(loadSerializedDefinition('variants.json'));
+const VARIANT_DEFINITIONS = {};
+const BOARD_DEFINITIONS = {};
+for (const [id, variant] of Object.entries(VARIANT_CATALOG)) {
+  if (!variant.enabled) continue;
+  try {
+    const units = normalizeUnitsDefinition(loadSerializedDefinition(variant.unitsPath));
+    const rules = normalizeRulesDefinition(loadSerializedDefinition(variant.rulesPath), units);
+    const board = normalizeBoardDefinition(loadSerializedDefinition(variant.boardPath));
+    const runtimeVariant = freezeDefinition({ ...variant, boardId: board.id });
+    VARIANT_DEFINITIONS[id] = freezeDefinition({ variant: runtimeVariant, board, units, rules });
+    BOARD_DEFINITIONS[board.id] = board;
+  } catch (err) {
+    console.error(`[DEFINITIONS] Skipping variant ${id}:`, err.message);
+  }
+}
+if (!VARIANT_DEFINITIONS.classic) throw new Error('classic variant definitions are required');
+const GAME_VARIANTS = freezeDefinition(Object.fromEntries(Object.entries(VARIANT_DEFINITIONS).map(([id, value]) => [id, value.variant])));
+const UNIT_DEFINITIONS = VARIANT_DEFINITIONS.classic.units;
+const RULE_DEFINITIONS = VARIANT_DEFINITIONS.classic.rules;
+const TYPES = UNIT_DEFINITIONS;
+const TERRAIN_RULES = RULE_DEFINITIONS.terrain;
+const GAME_RULES = RULE_DEFINITIONS;
+const DEFAULT_CONFIG = freezeDefinition({
+  reinforcement: Number(RULE_DEFINITIONS.configDefaults?.reinforcement) || FALLBACK_CONFIG.reinforcement,
+  attackerMax: Object.fromEntries(Object.entries(UNIT_DEFINITIONS).map(([type, unit]) => [type, Number(unit.deployLimit?.attacker) || 0])),
+  defenderMax: Object.fromEntries(Object.entries(UNIT_DEFINITIONS).map(([type, unit]) => [type, Number(unit.deployLimit?.defender) || 0])),
+  allowDeployAfterAction: RULE_DEFINITIONS.configDefaults?.allowDeployAfterAction !== false
+});
+
+function normalizeVariantId(value) {
+  return Object.hasOwn(VARIANT_DEFINITIONS, value) ? value : 'classic';
+}
+
+function boardForVariant(variantId) {
+  return VARIANT_DEFINITIONS[normalizeVariantId(variantId)]?.board || VARIANT_DEFINITIONS.classic.board;
+}
+
+function definitionsForVariant(variantId) {
+  const normalized = normalizeVariantId(variantId);
+  const definitions = VARIANT_DEFINITIONS[normalized] || VARIANT_DEFINITIONS.classic;
+  return {
+    variantId: normalized,
+    variant: definitions.variant,
+    board: definitions.board,
+    units: definitions.units,
+    rules: definitions.rules
+  };
+}
+
+function variantCatalogForClient() {
+  return Object.values(VARIANT_DEFINITIONS).map(definitions => ({
+    id: definitions.variant.id,
+    name: definitions.variant.name,
+    category: definitions.variant.category,
+    engine: definitions.variant.engine,
+    supportsAi: definitions.variant.supportsAi,
+    units: definitions.units,
+    defaults: defaultConfigForVariant(definitions.variant.id),
+    ui: definitions.rules.ui || {}
+  }));
+}
+
+function deploymentRowFor(g, player) {
+  const board = BOARD_DEFINITIONS[g?.boardId] || boardForVariant(g?.variantId);
+  return board.deploymentRows?.[player] ?? (player === 'attacker' ? 6 : 1);
+}
 
 const rooms = new Map();
 let nextRoomNumber = 1;
@@ -64,14 +288,40 @@ function unique(arr) {
   return out;
 }
 
-function validCell(row, col) {
-  return row >= 1 && row <= 6 && (row === 5 ? col >= 1 && col <= 4 : col >= 0 && col <= 4);
+function boardDefinition(boardId = 'classic') {
+  return BOARD_DEFINITIONS[boardId] || BOARD_DEFINITIONS.classic;
 }
 
-function terrainAt(row, col) {
-  if (row === 2 && (col === 1 || col === 3)) return 1; // fortress
-  if (row === 3 && [0, 1, 3, 4].includes(col)) return 2; // stairs
-  return 0;
+function validCell(row, col, boardId = 'classic') {
+  return boardDefinition(boardId).rows.some(item => item.id === row && item.cells.some(cell => cell.col === col));
+}
+
+function terrainIdAt(row, col, boardId = 'classic') {
+  const rowDef = boardDefinition(boardId).rows.find(item => item.id === row);
+  return rowDef?.cells.find(cell => cell.col === col)?.terrain || '';
+}
+
+function terrainAt(row, col, boardId = 'classic') {
+  return terrainIdAt(row, col, boardId);
+}
+
+function unitDefinition(type, g = null) {
+  if (g?.rules?.units) return g.rules.units[type] || null;
+  return TYPES[type] || null;
+}
+
+function terrainRuleFor(g, row, col) {
+  if (g?.rules?.terrain) return g.rules.terrain[terrainIdAt(row, col, g.boardId)] || null;
+  return TERRAIN_RULES[terrainIdAt(row, col, g?.boardId || 'classic')] || null;
+}
+
+function isInstantKill(g, attacker, target) {
+  const rule = g.rules?.combat?.instantKill;
+  if (!rule || !Array.isArray(rule.attackerTypes) || !Array.isArray(rule.targetTypes)) return false;
+  if (!rule.attackerTypes.includes(attacker.type) || !rule.targetTypes.includes(target.type)) return false;
+  return !Array.isArray(rule.terrainTypes)
+    || rule.terrainTypes.length === 0
+    || rule.terrainTypes.includes(terrainIdAt(target.row, target.col, g.boardId));
 }
 
 /*
@@ -81,42 +331,22 @@ function terrainAt(row, col) {
  *   第6行 col -> 第5行 col、col+1
  * 这里特别修正了原代码的第6行邻接错误。
  */
-function neighbors(row, col) {
-  let result = [];
-
-  if (row === 5) {
-    result = [
-      [5, col - 1], [5, col + 1],
-      [4, col - 1], [4, col],
-      [6, col - 1], [6, col]
-    ];
-  } else if (row === 4) {
-    result = [
-      [3, col], [4, col - 1], [4, col + 1],
-      [5, col], [5, col + 1]
-    ];
-  } else if (row === 6) {
-    result = [
-      [5, col], [5, col + 1],
-      [6, col - 1], [6, col + 1]
-    ];
-  } else {
-    result = [
-      [row - 1, col], [row + 1, col],
-      [row, col - 1], [row, col + 1]
-    ];
+function neighbors(row, col, boardId = 'classic') {
+  const result = [];
+  for (const edge of boardDefinition(boardId).connections || []) {
+    if (edge.from.row === row && edge.from.col === col) result.push([edge.to.row, edge.to.col]);
+    if (edge.to.row === row && edge.to.col === col) result.push([edge.from.row, edge.from.col]);
   }
-
-  return unique(result.filter(([r, c]) => validCell(r, c)));
+  return unique(result.filter(([r, c]) => validCell(r, c, boardId)));
 }
 
-function bfs(row, col, maxDistance) {
+function bfs(row, col, maxDistance, boardId = 'classic') {
   const dist = new Map([[key(row, col), 0]]);
   const q = [[row, col, 0]];
   for (let i = 0; i < q.length; i++) {
     const [r, c, d] = q[i];
     if (d >= maxDistance) continue;
-    for (const [nr, nc] of neighbors(r, c)) {
+    for (const [nr, nc] of neighbors(r, c, boardId)) {
       const k = key(nr, nc);
       if (!dist.has(k)) {
         dist.set(k, d + 1);
@@ -128,7 +358,10 @@ function bfs(row, col, maxDistance) {
   return dist;
 }
 
-function newGame(config, hostRole) {
+function newGame(config, hostRole, requestedVariantId = 'classic') {
+  const variantId = normalizeVariantId(requestedVariantId);
+  const definitions = definitionsForVariant(variantId);
+  const board = definitions.board;
   return {
     round: 1,
     currentPlayer: 'attacker',
@@ -139,12 +372,15 @@ function newGame(config, hostRole) {
     winner: null,
     log: [],
     config,
+    rules: definitions.rules,
     players: { attacker: null, defender: null },
     spectators: new Set(),
     started: false,
     lastEvent: null,
     lastChat: { attacker: '', defender: '' },
     gameMode: 'pvp',
+    variantId,
+    boardId: board.id,
     botRole: null,
     botDifficulty: 'normal',
     winnerReason: null
@@ -180,17 +416,22 @@ function createUnit(g, player, type, row, col) {
   return u;
 }
 
-function canEnterTerrain(unit, row, col) {
-  const t = terrainAt(row, col);
-  if (t === 0) return true;
-  if (t === 1) return unit.type === 'infantry' || unit.type === 'antiTank';
-  if (t === 2) return unit.type === 'infantry';
-  return false;
+function canEnterTerrain(g, unit, row, col) {
+  const rule = terrainRuleFor(g, row, col);
+  return !!rule?.passableUnits?.includes(unit.type);
 }
 
 function stairsEntryAllowed(g, unit, tr, tc) {
-  if (unit.type !== 'infantry' || unit.row !== 4 || tr !== 3 || terrainAt(tr, tc) !== 2) return true;
-  if (!unit.shot) return true;
+  const specialEntry = terrainRuleFor(g, tr, tc)?.specialEntry;
+  if (!specialEntry) return true;
+  if (typeof specialEntry === 'string') {
+    if (specialEntry !== 'infantry-row4-to-row3' || unit.type !== 'infantry' || unit.row !== 4 || tr !== 3) return true;
+    return !unit.shot || !!unit.lastShotTarget && unit.lastShotTarget.row === tr && unit.lastShotTarget.col === tc;
+  }
+  if (specialEntry.unitType && specialEntry.unitType !== unit.type) return true;
+  if (Number.isInteger(Number(specialEntry.fromRow)) && Number(specialEntry.fromRow) !== unit.row) return true;
+  if (Number.isInteger(Number(specialEntry.toRow)) && Number(specialEntry.toRow) !== tr) return true;
+  if (specialEntry.requiresShotTarget !== true || !unit.shot) return true;
   return !!unit.lastShotTarget && unit.lastShotTarget.row === tr && unit.lastShotTarget.col === tc;
 }
 
@@ -202,9 +443,9 @@ function legalPath(g, unit, tr, tc, maxSteps) {
     const [r, c, d, path] = q[i];
     if (r === tr && c === tc) return path;
     if (d >= maxSteps) continue;
-    for (const [nr, nc] of neighbors(r, c)) {
+    for (const [nr, nc] of neighbors(r, c, g.boardId)) {
       if (unitAt(g, nr, nc)) continue;
-      if (!canEnterTerrain(unit, nr, nc)) continue;
+      if (!canEnterTerrain(g, unit, nr, nc)) continue;
       if (!stairsEntryAllowed(g, unit, nr, nc)) continue;
       const k = key(nr, nc);
       if (dist.has(k)) continue;
@@ -217,13 +458,15 @@ function legalPath(g, unit, tr, tc, maxSteps) {
 
 function moveTargets(g, unit) {
   if (!unit.canAct) return [];
-  if (unit.type === 'antiTank' && (unit.shot || unit.moved)) return [];
-  if (unit.type === 'infantry' && unit.moved) return [];
-  const remaining = unit.type === 'machineGun' ? 2 - unit.moveSteps : 1;
+  const actionRules = unitDefinition(unit.type, g)?.actionRules || {};
+  if (unit.shot && actionRules.canMoveAfterShot === false) return [];
+  if (unit.moved && actionRules.maxMoveActions === 1) return [];
+  const maxMoveSteps = Number(unitDefinition(unit.type, g)?.maxMoveSteps) || 1;
+  const remaining = maxMoveSteps - (unit.moveSteps || 0);
   if (remaining <= 0) return [];
 
   const out = [];
-  for (const [cellKey] of bfs(unit.row, unit.col, remaining)) {
+  for (const [cellKey] of bfs(unit.row, unit.col, remaining, g.boardId)) {
     const [r, c] = cellKey.split(',').map(Number);
     if (unitAt(g, r, c)) continue;
     const path = legalPath(g, unit, r, c, remaining);
@@ -235,8 +478,9 @@ function moveTargets(g, unit) {
 
 function shootTargets(g, unit) {
   if (!unit.canAct || unit.shot) return [];
+  if (unit.moved && unitDefinition(unit.type, g)?.actionRules?.canShootAfterMove === false) return [];
   const out = [];
-  for (const [cellKey] of bfs(unit.row, unit.col, TYPES[unit.type].range)) {
+  for (const [cellKey] of bfs(unit.row, unit.col, Number(unitDefinition(unit.type, g)?.range) || 1, g.boardId)) {
     const [r, c] = cellKey.split(',').map(Number);
     const target = unitAt(g, r, c);
     if (target && target.player !== unit.player) out.push(target);
@@ -244,19 +488,19 @@ function shootTargets(g, unit) {
   return out;
 }
 
-function immune(target, attacker) {
-  if (target.type === 'machineGun' && (attacker.type === 'infantry' || attacker.type === 'machineGun')) return true;
-  if (terrainAt(target.row, target.col) === 1 && (attacker.type === 'infantry' || attacker.type === 'machineGun')) return true;
+function immune(g, target, attacker) {
+  if (unitDefinition(target.type, g)?.immuneFrom?.includes(attacker.type)) return true;
+  const terrainRule = terrainRuleFor(g, target.row, target.col);
+  if (terrainRule?.attackImmuneFrom?.includes(attacker.type)) return true;
   return false;
 }
 
 function finishAction(g, u) {
-  if (u.type === 'antiTank') {
-    u.canAct = false;
-    return;
-  }
-  if (u.type === 'infantry' && u.moved && u.shot) u.canAct = false;
-  if (u.type === 'machineGun' && u.moveSteps >= 2 && u.shot) u.canAct = false;
+  const definition = unitDefinition(u.type, g);
+  const endWhen = definition?.actionRules?.endWhen;
+  if (endWhen === 'movedOrShot' && (u.moved || u.shot)) u.canAct = false;
+  if (endWhen === 'movedAndShot' && u.moved && u.shot) u.canAct = false;
+  if (endWhen === 'maxMoveStepsAndShot' && u.moveSteps >= (definition?.maxMoveSteps || 1) && u.shot) u.canAct = false;
 }
 
 function resetTurnForCurrentPlayer(g) {
@@ -276,12 +520,13 @@ function resetTurnForCurrentPlayer(g) {
 }
 
 function checkEnd(g) {
-  const a1 = g.units.find(u => u.player === 'attacker' && u.row === 1);
+  const attackerTargetRow = Number(g.rules?.victory?.attackerTargetRow) || 1;
+  const a1 = g.units.find(u => u.player === 'attacker' && u.row === attackerTargetRow);
   if (a1) {
     g.state = 'ended';
     g.winner = 'attacker';
     g.winnerReason = 'attacker_reached_first_row';
-    addLog(g, `进攻方 ${TYPES[a1.type].name}#${a1.id} 到达第一行，进攻方胜利。`);
+    addLog(g, `进攻方 ${unitDefinition(a1.type, g)?.name || a1.type}#${a1.id} 到达目标行，进攻方胜利。`);
     setEvent(g, { type: 'win', winner: 'attacker', unitId: a1.id });
     return true;
   }
@@ -299,12 +544,12 @@ function checkEnd(g) {
 function deploy(g, player, type, row, col) {
   if (g.state !== 'playing') throw new Error('游戏尚未开始或已经结束');
   if (g.currentPlayer !== player) throw new Error('尚未轮到你');
-  if (!TYPES[type]) throw new Error('未知兵种');
-  const targetRow = player === 'attacker' ? 6 : 1;
+  if (!unitDefinition(type, g)) throw new Error('未知兵种');
+  const targetRow = deploymentRowFor(g, player);
   if (row !== targetRow) throw new Error(`只能部署在第${targetRow}行`);
-  if (!validCell(row, col)) throw new Error('无效格子');
+  if (!validCell(row, col, g.boardId)) throw new Error('无效格子');
   if (unitAt(g, row, col)) throw new Error('该位置已有单位');
-  if (player === 'defender' && type === 'machineGun') throw new Error('防守方没有机枪车');
+  if (!unitDefinition(type)?.allowedPlayers?.includes(player)) throw new Error('该阵营不能部署此兵种');
   const max = g.config[player === 'attacker' ? 'attackerMax' : 'defenderMax'][type] ?? 0;
   if (countType(g, player, type) >= max) throw new Error('该兵种已达到房主设置的上限');
   if (player === 'attacker' && g.attackerReinforcement <= 0) throw new Error('增援已经耗尽');
@@ -316,7 +561,7 @@ function deploy(g, player, type, row, col) {
 
   const u = createUnit(g, player, type, row, col);
   if (player === 'attacker') g.attackerReinforcement--;
-  addLog(g, `${player === 'attacker' ? '进攻方' : '防守方'}部署${TYPES[type].name}#${u.id}。`);
+  addLog(g, `${player === 'attacker' ? '进攻方' : '防守方'}部署${unitDefinition(type, g)?.name || type}#${u.id}。`);
   setEvent(g, { type: 'deploy', unitId: u.id });
 }
 
@@ -336,10 +581,11 @@ function move(g, player, id, row, col) {
   u.turnActionStarted = true;
   u.moveSteps += target.distance;
 
-  addLog(g, `${player === 'attacker' ? '进攻方' : '防守方'}${TYPES[u.type].name}#${u.id}移动到(${row},${displayCol(row, col)})。`);
+  addLog(g, `${player === 'attacker' ? '进攻方' : '防守方'}${unitDefinition(u.type, g)?.name || u.type}#${u.id}移动到(${row},${displayCol(row, col, g.boardId)})。`);
   setEvent(g, { type: 'move', unitId: u.id, unitType: u.type, from, to: { row, col }, distance: target.distance });
 
-  if (player === 'attacker' && row === 1) { checkEnd(g); return; }
+  const attackerTargetRow = Number(g.rules?.victory?.attackerTargetRow) || 1;
+  if (player === 'attacker' && row === attackerTargetRow) { checkEnd(g); return; }
   finishAction(g, u);
 }
 
@@ -354,29 +600,30 @@ function shoot(g, player, id, targetId) {
   a.turnActionStarted = true;
   a.lastShotTarget = { row: t.row, col: t.col };
 
-  if (immune(t, a)) {
-    addLog(g, `${TYPES[a.type].name}#${a.id}射击${TYPES[t.type].name}#${t.id}，未造成伤害。`);
+  if (immune(g, t, a)) {
+    addLog(g, `${unitDefinition(a.type, g)?.name || a.type}#${a.id}射击${unitDefinition(t.type, g)?.name || t.type}#${t.id}，未造成伤害。`);
     setEvent(g, { type: 'shoot', attackerId: a.id, attackerType: a.type, targetId: t.id, targetType: t.type, result: 'immune', from: { row: a.row, col: a.col }, targetPos: { row: t.row, col: t.col } });
     finishAction(g, a);
     return;
   }
 
-  if (a.type === 'antiTank' && (t.type === 'machineGun' || terrainAt(t.row, t.col) === 1)) {
-    addLog(g, `${TYPES[a.type].name}#${a.id}击毁${TYPES[t.type].name}#${t.id}。`);
+  if (isInstantKill(g, a, t)) {
+    addLog(g, `${unitDefinition(a.type, g)?.name || a.type}#${a.id}击毁${unitDefinition(t.type, g)?.name || t.type}#${t.id}。`);
     const deadUnit = { ...t };
     g.units = g.units.filter(x => x.id !== t.id);
-    setEvent(g, { type: 'kill', attackerId: a.id, attackerType: a.type, targetId: t.id, targetType: t.type, reason: 'antiTank', from: { row: a.row, col: a.col }, targetPos: { row: t.row, col: t.col }, deadUnit });
+    setEvent(g, { type: 'kill', attackerId: a.id, attackerType: a.type, targetId: t.id, targetType: t.type, reason: g.rules?.combat?.instantKill?.reason || 'instant_kill', from: { row: a.row, col: a.col }, targetPos: { row: t.row, col: t.col }, deadUnit });
     finishAction(g, a);
     checkEnd(g);
     return;
   }
 
   t.hits++;
-  addLog(g, `${TYPES[a.type].name}#${a.id}命中${TYPES[t.type].name}#${t.id}，受击${t.hits}/2。`);
-  if (t.hits >= 2) {
+  const hitsToDestroy = Number(g.rules?.combat?.hitsToDestroy) || 2;
+  addLog(g, `${unitDefinition(a.type, g)?.name || a.type}#${a.id}命中${unitDefinition(t.type, g)?.name || t.type}#${t.id}，受击${t.hits}/${hitsToDestroy}。`);
+  if (t.hits >= hitsToDestroy) {
     const deadUnit = { ...t };
     g.units = g.units.filter(x => x.id !== t.id);
-    addLog(g, `${TYPES[t.type].name}#${t.id}被击杀。`);
+    addLog(g, `${unitDefinition(t.type, g)?.name || t.type}#${t.id}被击杀。`);
     setEvent(g, { type: 'kill', attackerId: a.id, attackerType: a.type, targetId: t.id, targetType: t.type, reason: 'twoHits', from: { row: a.row, col: a.col }, targetPos: { row: t.row, col: t.col }, deadUnit });
   } else {
     setEvent(g, { type: 'hit', attackerId: a.id, attackerType: a.type, targetId: t.id, targetType: t.type, hits: t.hits, from: { row: a.row, col: a.col }, targetPos: { row: t.row, col: t.col } });
@@ -392,7 +639,7 @@ function endUnit(g, player, id) {
   if (!u.canAct) return;
   u.canAct = false;
   u.turnActionStarted = true;
-  addLog(g, `${TYPES[u.type].name}#${u.id}主动结束本回合行动。`);
+  addLog(g, `${unitDefinition(u.type, g)?.name || u.type}#${u.id}主动结束本回合行动。`);
   setEvent(g, { type: 'endUnit', unitId: u.id });
 }
 
@@ -409,7 +656,10 @@ function endTurn(g, player) {
   if (g.state === 'playing') addLog(g, `${g.currentPlayer === 'attacker' ? '进攻方' : '防守方'}开始第${g.round}回合。`);
 }
 
-function displayCol(row, col) { return row === 5 ? (col + 0.5).toFixed(1) : String(col + 1); }
+function displayCol(row, col, boardId = 'classic') {
+  const cell = boardDefinition(boardId).rows.find(item => item.id === row)?.cells.find(item => item.col === col);
+  return cell?.displayCol ?? String(col + 1);
+}
 
 function publicState(g, you) {
   const youUnits = g.units.filter(u => u.player === you).map(u => ({
@@ -429,12 +679,17 @@ function publicState(g, you) {
     log: g.log,
     started: g.started,
     config: g.config,
+    rules: g.rules || GAME_RULES,
     players: { attacker: !!g.players.attacker, defender: !!g.players.defender },
     you,
     roomPlayerCount: (g.players.attacker ? 1 : 0) + (g.players.defender ? 1 : 0),
     roomName: g.roomName || null,
     lastEvent: g.lastEvent,
     gameMode: g.gameMode,
+    variantId: g.variantId,
+    variant: GAME_VARIANTS[g.variantId] || GAME_VARIANTS.classic,
+    boardId: g.boardId,
+    board: BOARD_DEFINITIONS[g.boardId] || boardForVariant(g.variantId),
     botRole: g.botRole,
     botDifficulty: g.botDifficulty
   };
@@ -448,6 +703,9 @@ function lobbySnapshot() {
       name: room.name,
       hostRole: room.hostRole,
       gameMode: room.gameMode,
+      variantId: room.variantId,
+      variant: GAME_VARIANTS[room.variantId] || GAME_VARIANTS.classic,
+      boardId: room.game.boardId,
       botDifficulty: room.botDifficulty,
       status: room.game.started ? 'playing' : 'waiting',
       playerCount: (room.game.players.attacker ? 1 : 0) + (room.game.players.defender ? 1 : 0),
@@ -474,24 +732,43 @@ function broadcast(room) {
   }
 }
 
-function sanitizeConfig(raw = {}) {
+function defaultConfigForVariant(variantId = 'classic') {
+  const units = definitionsForVariant(variantId).units;
+  const attackerMax = {}, defenderMax = {};
+  for (const [type, definition] of Object.entries(units)) {
+    const defaults = definition.deployLimit || {};
+    attackerMax[type] = Number.isFinite(Number(defaults.attacker)) ? Number(defaults.attacker) : 0;
+    defenderMax[type] = Number.isFinite(Number(defaults.defender)) ? Number(defaults.defender) : 0;
+  }
+  if (variantId === 'classic') {
+    Object.assign(attackerMax, DEFAULT_CONFIG.attackerMax);
+    Object.assign(defenderMax, DEFAULT_CONFIG.defenderMax);
+  }
+  return { reinforcement: DEFAULT_CONFIG.reinforcement, attackerMax, defenderMax, allowDeployAfterAction: DEFAULT_CONFIG.allowDeployAfterAction };
+}
+
+function sanitizeConfig(raw = {}, variantId = 'classic') {
   const num = (v, min, max, d) => {
     const n = Number(v);
     return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.floor(n))) : d;
   };
+  const defaults = defaultConfigForVariant(variantId);
+  const units = definitionsForVariant(variantId).units;
+  const legacyNames = { attacker: 'attacker', defender: 'defender' };
+  const maxUnits = raw.maxUnits && typeof raw.maxUnits === 'object' ? raw.maxUnits : {};
+  const buildLimits = player => Object.fromEntries(Object.entries(units).map(([type], index) => {
+    const legacyKey = `${legacyNames[player]}${type[0].toUpperCase()}${type.slice(1)}`;
+    const legacyValue = raw[legacyKey];
+    const source = maxUnits[player]?.[type] ?? legacyValue;
+    return [type, num(source, 0, 999, defaults[player === 'attacker' ? 'attackerMax' : 'defenderMax'][type] ?? 0)];
+  }));
   return {
-    reinforcement: num(raw.reinforcement, 1, 999, DEFAULT_CONFIG.reinforcement),
-    attackerMax: {
-      infantry: num(raw.attackerInfantry, 0, 50, DEFAULT_CONFIG.attackerMax.infantry),
-      antiTank: num(raw.attackerAntiTank, 0, 10, DEFAULT_CONFIG.attackerMax.antiTank),
-      machineGun: num(raw.attackerMachineGun, 0, 10, DEFAULT_CONFIG.attackerMax.machineGun)
-    },
-    defenderMax: {
-      infantry: num(raw.defenderInfantry, 0, 50, DEFAULT_CONFIG.defenderMax.infantry),
-      antiTank: num(raw.defenderAntiTank, 0, 10, DEFAULT_CONFIG.defenderMax.antiTank),
-      machineGun: 0
-    },
-    allowDeployAfterAction: raw.allowDeployAfterAction === true
+    reinforcement: num(raw.reinforcement, 0, 999999, defaults.reinforcement),
+    attackerMax: buildLimits('attacker'),
+    defenderMax: buildLimits('defender'),
+    allowDeployAfterAction: raw.allowDeployAfterAction == null
+      ? defaults.allowDeployAfterAction
+      : raw.allowDeployAfterAction === true
   };
 }
 
@@ -513,27 +790,36 @@ function opponentOf(player) {
   return player === 'attacker' ? 'defender' : 'attacker';
 }
 
-function graphDistance(fromRow, fromCol, toRow, toCol) {
+function graphDistance(fromRow, fromCol, toRow, toCol, boardId = 'classic') {
   if (fromRow === toRow && fromCol === toCol) return 0;
-  return bfs(fromRow, fromCol, 12).get(key(toRow, toCol)) ?? 99;
+  return bfs(fromRow, fromCol, 12, boardId).get(key(toRow, toCol)) ?? 99;
 }
 
-function unitValue(type) {
-  if (type === 'antiTank') return 85;
-  if (type === 'machineGun') return 70;
-  return 45;
+function unitValue(type, g = null) {
+  return Number(unitDefinition(type, g)?.ai?.value) || 1;
 }
 
-function canDamageAt(attacker, targetType, row, col) {
-  if (targetType === 'machineGun' && (attacker.type === 'infantry' || attacker.type === 'machineGun')) return false;
-  if (terrainAt(row, col) === 1 && (attacker.type === 'infantry' || attacker.type === 'machineGun')) return false;
+function aiCombatBonus(g, attacker, target, row, col) {
+  const attackerRole = unitDefinition(attacker.type, g)?.ai?.role;
+  const targetRole = unitDefinition(target.type, g)?.ai?.role;
+  const terrain = terrainAt(row, col, g.boardId);
+  return (Array.isArray(g.rules?.ai?.combatBonuses) ? g.rules.ai.combatBonuses : [])
+    .filter(rule => (!rule.attackerRole || rule.attackerRole === attackerRole)
+      && (!rule.targetRole || rule.targetRole === targetRole)
+      && (!rule.terrain || rule.terrain === terrain))
+    .reduce((sum, rule) => sum + (Number(rule.score) || 0), 0);
+}
+
+function canDamageAt(g, attacker, targetType, row, col) {
+  if (unitDefinition(targetType, g)?.immuneFrom?.includes(attacker.type)) return false;
+  if (terrainRuleFor(g, row, col)?.attackImmuneFrom?.includes(attacker.type)) return false;
   return true;
 }
 
-function shotWouldKill(attacker, target) {
-  if (!canDamageAt(attacker, target.type, target.row, target.col)) return false;
-  if (attacker.type === 'antiTank' && (target.type === 'machineGun' || terrainAt(target.row, target.col) === 1)) return true;
-  return target.hits >= 1;
+function shotWouldKill(g, attacker, target) {
+  if (!canDamageAt(g, attacker, target.type, target.row, target.col)) return false;
+  if (isInstantKill(g, attacker, target)) return true;
+  return target.hits >= (Number(g.rules?.combat?.hitsToDestroy) || 2) - 1;
 }
 
 function chooseRanked(items, difficulty) {
@@ -547,24 +833,27 @@ function chooseRanked(items, difficulty) {
 
 function botDeployChoices(g, player) {
   if (player === 'attacker' && g.attackerReinforcement <= 0) return [];
-  const row = player === 'attacker' ? 6 : 1;
-  const emptyCols = [0, 1, 2, 3, 4].filter(col => !unitAt(g, row, col));
+  const row = deploymentRowFor(g, player);
+  const rowDef = boardDefinition(g.boardId).rows.find(item => item.id === row);
+  const emptyCols = (rowDef?.cells || []).map(cell => cell.col).filter(col => !unitAt(g, row, col));
   if (!emptyCols.length) return [];
 
   const maxima = g.config[player === 'attacker' ? 'attackerMax' : 'defenderMax'];
   const enemies = alive(g, opponentOf(player));
-  return Object.keys(TYPES).flatMap(type => {
-    if (type === 'machineGun' && player === 'defender') return [];
+  const aiRules = g.rules?.ai || {};
+  const roleBonuses = aiRules.roleBonuses || {};
+  return Object.keys(g.rules?.units || {}).flatMap(type => {
+    if (!unitDefinition(type, g)?.allowedPlayers?.includes(player)) return [];
     if (countType(g, player, type) >= (maxima[type] ?? 0)) return [];
     return emptyCols.map(col => {
-      let score = type === 'antiTank' ? 85 : type === 'machineGun' ? 72 : 60;
+      let score = unitValue(type, g) + 15;
       score -= countType(g, player, type) * 9;
       score += 10 - Math.abs(col - 2) * 4;
-      if (type === 'antiTank' && enemies.some(u => u.type === 'machineGun' || terrainAt(u.row, u.col) === 1)) score += 120;
-      if (type === 'machineGun' && !enemies.some(u => u.type === 'antiTank')) score += 25;
+      if (unitDefinition(type, g)?.ai?.role === 'antiTank') score += enemies.reduce((sum, enemy) => sum + aiCombatBonus(g, { type }, enemy, enemy.row, enemy.col), 0);
+      if (unitDefinition(type, g)?.ai?.role === 'machineGun' && !enemies.some(u => unitDefinition(u.type, g)?.ai?.role === 'antiTank')) score += Number(roleBonuses.machineGunWithoutAntiTank ?? 0);
       if (enemies.length) {
-        const nearestColumn = Math.min(...enemies.map(u => Math.abs((u.row === 5 ? u.col - 0.5 : u.col) - col)));
-        score -= nearestColumn * 3;
+        const nearestDistance = Math.min(...enemies.map(u => graphDistance(row, col, u.row, u.col, g.boardId)));
+        score -= nearestDistance * 3;
       }
       return { type, row, col, score };
     });
@@ -578,37 +867,37 @@ function chooseBotDeployment(g, player, difficulty) {
 function threatAt(g, unit, row, col) {
   let threat = 0;
   for (const enemy of alive(g, opponentOf(unit.player))) {
-    if (graphDistance(enemy.row, enemy.col, row, col) > TYPES[enemy.type].range) continue;
-    if (!canDamageAt(enemy, unit.type, row, col)) continue;
-    if (enemy.type === 'antiTank' && (unit.type === 'machineGun' || terrainAt(row, col) === 1)) threat += 190;
-    else threat += unit.hits > 0 ? 85 : 48;
+    if (graphDistance(enemy.row, enemy.col, row, col, g.boardId) > (Number(unitDefinition(enemy.type, g)?.range) || 1)) continue;
+    if (!canDamageAt(g, enemy, unit.type, row, col)) continue;
+    threat += Math.max(0, aiCombatBonus(g, enemy, unit, row, col)) + (unit.hits > 0 ? 85 : 48);
   }
   return threat;
 }
 
 function defensiveBlockValue(g, row, col) {
-  if (row !== 1) return 0;
+  const targetRow = Number(g.rules?.victory?.attackerTargetRow);
+  if (!Number.isInteger(targetRow) || row !== targetRow) return 0;
   let value = 0;
   for (const attacker of alive(g, 'attacker')) {
-    if (neighbors(attacker.row, attacker.col).some(([r, c]) => r === row && c === col)) value += 800;
+    if (neighbors(attacker.row, attacker.col, g.boardId).some(([r, c]) => r === row && c === col)) value += 800;
   }
   return value;
 }
 
 function scoreShot(g, attacker, target) {
-  if (!canDamageAt(attacker, target.type, target.row, target.col)) {
+  if (!canDamageAt(g, attacker, target.type, target.row, target.col)) {
     return { score: -900, priority: 'none' };
   }
 
-  const kill = shotWouldKill(attacker, target);
-  let score = 95 + unitValue(target.type);
+  const kill = shotWouldKill(g, attacker, target);
+  let score = 95 + unitValue(target.type, g);
   if (target.hits > 0) score += 125;
-  if (kill) score += 560 + unitValue(target.type) * 2;
+  if (kill) score += 560 + unitValue(target.type, g) * 2;
   if (target.player === 'attacker') {
-    if (target.row === 2) score += 360;
-    else if (target.row === 3) score += 150;
+    const targetRowScores = g.rules?.ai?.targetRowScores || {};
+    score += Number(targetRowScores[String(target.row)] || 0);
   }
-  if (attacker.type === 'antiTank' && (target.type === 'machineGun' || terrainAt(target.row, target.col) === 1)) score += 150;
+  score += aiCombatBonus(g, attacker, target, target.row, target.col);
   return { score, priority: kill ? 'kill' : 'hit' };
 }
 
@@ -618,29 +907,30 @@ function scoreMove(g, unit, target, difficulty) {
   let score = -target.distance * 2;
 
   if (unit.player === 'attacker') {
-    if (target.row === 1) return { score: 100000, priority: 'win' };
+    const attackerTargetRow = Number(g.rules?.victory?.attackerTargetRow) || 1;
+    if (target.row === attackerTargetRow) return { score: 100000, priority: 'win' };
     score += (unit.row - target.row) * 62;
-    score += (6 - target.row) * 4;
-    if (terrainAt(target.row, target.col) === 1) score += 38;
-    if (terrainAt(target.row, target.col) === 2) score += 20;
+    score += (Math.max(...boardDefinition(g.boardId).rows.map(row => row.id)) - target.row) * 4;
+    const terrainScores = g.rules?.ai?.terrainScores || {};
+    score += Number(terrainScores[terrainAt(target.row, target.col, g.boardId)] || 0);
   } else if (enemies.length) {
-    const before = Math.min(...enemies.map(enemy => graphDistance(unit.row, unit.col, enemy.row, enemy.col)));
-    const after = Math.min(...enemies.map(enemy => graphDistance(target.row, target.col, enemy.row, enemy.col)));
+    const before = Math.min(...enemies.map(enemy => graphDistance(unit.row, unit.col, enemy.row, enemy.col, g.boardId)));
+    const after = Math.min(...enemies.map(enemy => graphDistance(target.row, target.col, enemy.row, enemy.col, g.boardId)));
     score += (before - after) * 34;
     score += defensiveBlockValue(g, target.row, target.col) - defensiveBlockValue(g, unit.row, unit.col);
-    if (target.row === 2) score += 24;
+    score += Number((g.rules?.ai?.defenderRowScore || {})[String(target.row)] || 0);
   }
 
   if (!unit.shot) {
     const bestFutureShot = enemies
-      .filter(enemy => graphDistance(target.row, target.col, enemy.row, enemy.col) <= TYPES[unit.type].range)
+      .filter(enemy => graphDistance(target.row, target.col, enemy.row, enemy.col, g.boardId) <= (Number(unitDefinition(unit.type, g)?.range) || 1))
       .map(enemy => scoreShot(g, { ...unit, row: target.row, col: target.col }, enemy).score)
       .reduce((best, value) => Math.max(best, value), 0);
     score += bestFutureShot * 0.18;
   }
 
-  const mobility = neighbors(target.row, target.col)
-    .filter(([r, c]) => !unitAt(g, r, c) && canEnterTerrain(unit, r, c)).length;
+  const mobility = neighbors(target.row, target.col, g.boardId)
+    .filter(([r, c]) => !unitAt(g, r, c) && canEnterTerrain(g, unit, r, c)).length;
   score += mobility * 3 * profile.mobilityWeight;
   score -= threatAt(g, unit, target.row, target.col) * profile.dangerWeight;
   return { score, priority: 'move' };
@@ -661,7 +951,7 @@ function botActionChoices(g, player, difficulty) {
       actions.push({ type: 'move', unitId: unit.id, row: target.row, col: target.col, ...scored });
     }
 
-    const usefulShot = shots.some(target => canDamageAt(unit, target.type, target.row, target.col));
+    const usefulShot = shots.some(target => canDamageAt(g, unit, target.type, target.row, target.col));
     const stopScore = usefulShot || moves.length ? -35 : 5;
     actions.push({ type: 'stop', unitId: unit.id, score: stopScore, priority: 'stop' });
   }
@@ -863,7 +1153,7 @@ const wss = new WebSocket.Server({ server: httpServer });
 wss.on('connection', ws => {
   ws.roomId = null;
   ws.role = null;
-  send(ws, { type: 'hello', message: 'connected' });
+  send(ws, { type: 'hello', message: 'connected', variants: variantCatalogForClient() });
 
   ws.on('message', raw => {
     try {
@@ -877,16 +1167,21 @@ wss.on('connection', ws => {
       if (m.type === 'create') {
         const hostRole = m.hostRole === 'defender' ? 'defender' : 'attacker';
         const gameMode = m.gameMode === 'ai' ? 'ai' : 'pvp';
+        const variantId = normalizeVariantId(m.variantId);
+        const variant = GAME_VARIANTS[variantId];
+        if (!variant?.enabled) throw new Error('该玩法当前不可用');
+        if (gameMode === 'ai' && variant.supportsAi !== true) throw new Error('该玩法暂不支持人机对战');
         const botRole = gameMode === 'ai' ? (hostRole === 'attacker' ? 'defender' : 'attacker') : null;
         const botDifficulty = normalizeBotDifficulty(m.botDifficulty);
-        const config = sanitizeConfig(m.config);
-        const g = newGame(config, hostRole);
+        const config = sanitizeConfig(m.config, variantId);
+        const g = newGame(config, hostRole, variantId);
         const id = `room-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const room = {
           id,
           name: `房间 ${nextRoomNumber++}`,
           hostRole,
           gameMode,
+          variantId,
           botRole,
           botDifficulty,
           botTimer: null,
@@ -916,7 +1211,7 @@ wss.on('connection', ws => {
           const difficultyName = { easy: '简单', normal: '普通', hard: '困难' }[botDifficulty];
           addLog(g, `人机对战开始。${difficultyName}机器人控制${botRole === 'attacker' ? '进攻方' : '防守方'}。`);
         }
-        send(ws, { type: 'created', id: room.id, name: room.name, role: hostRole, gameMode });
+        send(ws, { type: 'created', id: room.id, name: room.name, role: hostRole, gameMode, variantId, boardId: g.boardId });
         broadcast(room);
         broadcastLobby();
         scheduleBotTurn(room);
@@ -1104,7 +1399,18 @@ if (require.main === module) {
 module.exports = {
   testing: {
     DEFAULT_CONFIG,
+    BOARD_DEFINITIONS,
+    GAME_VARIANTS,
+    GAME_RULES,
+    serializeDefinition,
+    deserializeDefinition,
+    normalizeBoardDefinition,
+    normalizeUnitsDefinition,
+    normalizeRulesDefinition,
+    definitionsForVariant,
     newGame,
+    normalizeVariantId,
+    deploymentRowFor,
     createUnit,
     normalizeBotDifficulty,
     chooseBotDeployment,

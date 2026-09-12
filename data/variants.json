@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "variants": {
+    "classic": {
+      "id": "classic",
+      "name": "经典模式",
+      "category": "battle",
+      "enabled": true,
+      "engine": "classic",
+      "supportsAi": true,
+      "board": "maps/classic.json",
+      "units": "units/classic.json",
+      "rules": "rules/classic.json"
+    }
+  }
+}

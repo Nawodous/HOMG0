@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const WebSocket = require('ws');
 
 const PORT = process.env.PORT || 37788;
@@ -144,7 +145,7 @@ function normalizeRulesDefinition(raw, units) {
     id: String(source.id || 'classic'), version: Number(source.version) || 1,
     units, terrain: normalizedTerrain,
     combat: source.combat || {}, turn: source.turn || {}, victory: source.victory || {},
-    configDefaults: source.configDefaults || {}, ai: source.ai || {}, ui: source.ui || {}
+    configDefaults: source.configDefaults || {}, ai: source.ai || {}, ui: source.ui || {}, simultaneous: source.simultaneous || {}
   });
 }
 
@@ -175,9 +176,9 @@ function collectAudioFiles(dir, prefix = '') {
 
 
 const FALLBACK_CONFIG = {
-  reinforcement: 28,
-  attackerMax: { infantry: 5, antiTank: 1, machineGun: 1 },
-  defenderMax: { infantry: 4, antiTank: 1, machineGun: 0 },
+  reinforcement: 0,
+  attackerMax: {},
+  defenderMax: {},
   allowDeployAfterAction: true
 };
 
@@ -230,7 +231,7 @@ const TYPES = UNIT_DEFINITIONS;
 const TERRAIN_RULES = RULE_DEFINITIONS.terrain;
 const GAME_RULES = RULE_DEFINITIONS;
 const DEFAULT_CONFIG = freezeDefinition({
-  reinforcement: Number(RULE_DEFINITIONS.configDefaults?.reinforcement) || FALLBACK_CONFIG.reinforcement,
+  reinforcement: Number(RULE_DEFINITIONS.configDefaults?.reinforcement) >= 0 ? Number(RULE_DEFINITIONS.configDefaults.reinforcement) : FALLBACK_CONFIG.reinforcement,
   attackerMax: Object.fromEntries(Object.entries(UNIT_DEFINITIONS).map(([type, unit]) => [type, Number(unit.deployLimit?.attacker) || 0])),
   defenderMax: Object.fromEntries(Object.entries(UNIT_DEFINITIONS).map(([type, unit]) => [type, Number(unit.deployLimit?.defender) || 0])),
   allowDeployAfterAction: RULE_DEFINITIONS.configDefaults?.allowDeployAfterAction !== false
@@ -265,7 +266,8 @@ function variantCatalogForClient() {
     supportsAi: definitions.variant.supportsAi,
     units: definitions.units,
     defaults: defaultConfigForVariant(definitions.variant.id),
-    ui: definitions.rules.ui || {}
+    ui: definitions.rules.ui || {},
+    simultaneous: definitions.rules.simultaneous || {}
   }));
 }
 
@@ -362,16 +364,19 @@ function newGame(config, hostRole, requestedVariantId = 'classic') {
   const variantId = normalizeVariantId(requestedVariantId);
   const definitions = definitionsForVariant(variantId);
   const board = definitions.board;
+  const simultaneousRules = definitions.rules.simultaneous || {};
+  const turnMode = config.turnMode === 'simultaneous' && simultaneousRules.enabled !== false ? 'simultaneous' : 'sequential';
+  const effectiveConfig = { ...config, turnMode };
   return {
     round: 1,
-    currentPlayer: 'attacker',
-    attackerReinforcement: config.reinforcement,
+    currentPlayer: turnMode === 'simultaneous' ? 'both' : 'attacker',
+    attackerReinforcement: effectiveConfig.reinforcement,
     nextUnitId: 1,
     units: [],
     state: 'waiting',
     winner: null,
     log: [],
-    config,
+    config: effectiveConfig,
     rules: definitions.rules,
     players: { attacker: null, defender: null },
     spectators: new Set(),
@@ -383,7 +388,11 @@ function newGame(config, hostRole, requestedVariantId = 'classic') {
     boardId: board.id,
     botRole: null,
     botDifficulty: 'normal',
-    winnerReason: null
+    winnerReason: null,
+    turnMode,
+    phase: 'waiting',
+    plans: { attacker: null, defender: null },
+    planningDeadline: null
   };
 }
 
@@ -392,6 +401,29 @@ function getUnit(g, id) { return g.units.find(u => u.id === id); }
 function alive(g, player) { return g.units.filter(u => !player || u.player === player); }
 function countType(g, player, type) { return alive(g, player).filter(u => u.type === type).length; }
 
+function canSelectUnit(g, unit, player) {
+  if (!unit || unit.player !== player || g.state !== 'playing') return false;
+  if (g.turnMode === 'simultaneous') return g.phase === 'planning' && !g.plans?.[player]?.submitted && unit.canAct && unit.deployedRound !== g.round;
+  return g.currentPlayer === player && unit.canAct;
+}
+
+function legalDeployments(g, player) {
+  if ((player !== 'attacker' && player !== 'defender') || g.state !== 'playing') return [];
+  if (g.turnMode === 'simultaneous' && (g.phase !== 'planning' || g.plans?.[player]?.submitted)) return [];
+  const row = deploymentRowFor(g, player);
+  const plan = g.turnMode === 'simultaneous' ? (g.plans?.[player] || createSimultaneousPlan()) : null;
+  const pending = plan?.deployments || [];
+  const hasAllowedType = Object.entries(g.rules?.units || {}).some(([type, definition]) => {
+    if (!definition.allowedPlayers?.includes(player)) return false;
+    const max = g.config[player === 'attacker' ? 'attackerMax' : 'defenderMax']?.[type] ?? 0;
+    return countType(g, player, type) + pending.filter(item => item.type === type).length < max;
+  });
+  if (!hasAllowedType || (player === 'attacker' && g.attackerReinforcement - pending.length <= 0)) return [];
+  return (boardDefinition(g.boardId).rows.find(item => item.id === row)?.cells || [])
+    .filter(cell => !unitAt(g, row, cell.col) && !pending.some(item => item.row === row && item.col === cell.col))
+    .map(cell => ({ row, col: cell.col }));
+}
+
 function addLog(g, text) {
   const t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
   g.log.push(`[${t}] ${text}`);
@@ -399,6 +431,49 @@ function addLog(g, text) {
 }
 
 function setEvent(g, event) { g.lastEvent = { ...event, at: Date.now() }; }
+
+function createSimultaneousPlan() {
+  return { submitted: false, deployments: [], actions: {} };
+}
+
+function serializePlan(plan) {
+  return serializeDefinition(plan || createSimultaneousPlan());
+}
+
+function deserializePlan(serialized) {
+  const source = deserializeDefinition(serialized, 'plan');
+  const deployments = Array.isArray(source.deployments) ? source.deployments.slice(0, 100).map(item => ({ type: String(item?.type || ''), row: Number(item?.row), col: Number(item?.col) })).filter(item => item.type && Number.isInteger(item.row) && Number.isInteger(item.col)) : [];
+  const actions = {};
+  const rawActions = source.actions && typeof source.actions === 'object' ? source.actions : {};
+  for (const [id, item] of Object.entries(rawActions).slice(0, 200)) {
+    const unitId = Number(item?.unitId ?? id);
+    if (!Number.isInteger(unitId)) continue;
+    const action = { unitId };
+    if (item.shootTargetId != null && Number.isInteger(Number(item.shootTargetId))) action.shootTargetId = Number(item.shootTargetId);
+    if (item.moveTo && Number.isInteger(Number(item.moveTo.row)) && Number.isInteger(Number(item.moveTo.col))) action.moveTo = { row: Number(item.moveTo.row), col: Number(item.moveTo.col) };
+    if (item.end === true) action.end = true;
+    actions[unitId] = action;
+  }
+  return { submitted: source.submitted === true, deployments, actions };
+}
+
+function prepareSimultaneousPlanning(g) {
+  g.turnMode = 'simultaneous';
+  g.currentPlayer = 'both';
+  g.phase = 'planning';
+  g.plans = { attacker: createSimultaneousPlan(), defender: createSimultaneousPlan() };
+  const timeout = Number(g.rules?.simultaneous?.planningTimeoutMs);
+  g.planningDeadline = Number.isFinite(timeout) && timeout > 0 ? Date.now() + timeout : null;
+  for (const unit of g.units) {
+    unit.hits = 0;
+    unit.moved = false;
+    unit.shot = false;
+    unit.moveSteps = 0;
+    unit.lastShotTarget = null;
+    unit.turnActionStarted = false;
+    unit.canAct = unit.deployedRound === g.round ? false : true;
+  }
+}
 
 function createUnit(g, player, type, row, col) {
   const u = {
@@ -524,6 +599,7 @@ function checkEnd(g) {
   const a1 = g.units.find(u => u.player === 'attacker' && u.row === attackerTargetRow);
   if (a1) {
     g.state = 'ended';
+    g.phase = 'ended';
     g.winner = 'attacker';
     g.winnerReason = 'attacker_reached_first_row';
     addLog(g, `进攻方 ${unitDefinition(a1.type, g)?.name || a1.type}#${a1.id} 到达目标行，进攻方胜利。`);
@@ -532,6 +608,7 @@ function checkEnd(g) {
   }
   if (g.attackerReinforcement === 0 && alive(g, 'attacker').length === 0) {
     g.state = 'ended';
+    g.phase = 'ended';
     g.winner = 'defender';
     g.winnerReason = 'attacker_eliminated';
     addLog(g, '进攻方增援耗尽且场上全灭，防守方胜利。');
@@ -656,6 +733,271 @@ function endTurn(g, player) {
   if (g.state === 'playing') addLog(g, `${g.currentPlayer === 'attacker' ? '进攻方' : '防守方'}开始第${g.round}回合。`);
 }
 
+function simultaneousPlanFor(g, player) {
+  if (!g.plans[player]) g.plans[player] = createSimultaneousPlan();
+  return g.plans[player];
+}
+
+function ensureSimultaneousPlanning(g, player) {
+  if (g.turnMode !== 'simultaneous' || g.state !== 'playing' || g.phase !== 'planning') throw new Error('当前不是同时回合规划阶段');
+  if (player !== 'attacker' && player !== 'defender') throw new Error('观战者不能规划行动');
+  const plan = simultaneousPlanFor(g, player);
+  if (plan.submitted) throw new Error('本回合规划已经提交');
+  return plan;
+}
+
+function plannedDeploymentAt(plan, row, col) {
+  return plan.deployments.some(item => item.row === row && item.col === col);
+}
+
+function planSimultaneousDeploy(g, player, type, row, col) {
+  const plan = ensureSimultaneousPlanning(g, player);
+  const definition = unitDefinition(type, g);
+  if (!definition) throw new Error('未知兵种');
+  const targetRow = deploymentRowFor(g, player);
+  if (row !== targetRow) throw new Error(`只能部署在第${targetRow}行`);
+  if (!validCell(row, col, g.boardId)) throw new Error('无效格子');
+  if (unitAt(g, row, col) || plannedDeploymentAt(plan, row, col)) throw new Error('该位置已被占用或已计划部署');
+  if (!definition.allowedPlayers?.includes(player)) throw new Error('该阵营不能部署此兵种');
+  const maxima = g.config[player === 'attacker' ? 'attackerMax' : 'defenderMax'] || {};
+  if (countType(g, player, type) + plan.deployments.filter(item => item.type === type).length >= (maxima[type] ?? 0)) throw new Error('该兵种已达到房主设置的上限');
+  if (player === 'attacker' && g.attackerReinforcement - plan.deployments.length <= 0) throw new Error('增援已经耗尽');
+  if (!g.rules?.simultaneous?.deployDuringPlanning) throw new Error('当前玩法不允许规划阶段部署');
+  plan.deployments.push({ type, row, col });
+}
+
+function planSimultaneousAction(g, player, actionType, unitId, row, col, targetId) {
+  const plan = ensureSimultaneousPlanning(g, player);
+  const unit = getUnit(g, Number(unitId));
+  if (!unit || unit.player !== player) throw new Error('单位不存在或不是你的单位');
+  if (!unit.canAct || unit.deployedRound === g.round) throw new Error('该单位本回合不能行动');
+  const existing = { ...(plan.actions[unit.id] || { unitId: unit.id }), moveTo: plan.actions[unit.id]?.moveTo ? { ...plan.actions[unit.id].moveTo } : undefined };
+  if (existing.end) throw new Error('该单位已结束规划');
+  if (actionType === 'move') {
+    if (!Number.isInteger(row) || !Number.isInteger(col)) throw new Error('移动目标无效');
+    if (!moveTargets(g, unit).some(item => item.row === row && item.col === col)) throw new Error('不可移动到该位置');
+    existing.moveTo = { row, col };
+  } else if (actionType === 'shoot') {
+    const target = getUnit(g, Number(targetId));
+    if (!target || target.player === player) throw new Error('射击目标无效');
+    if (!shootTargets(g, unit).some(item => item.id === target.id)) throw new Error('目标不在射程内');
+    existing.shootTargetId = target.id;
+  } else if (actionType === 'endUnit') {
+    existing.end = true;
+  } else {
+    throw new Error('未知规划操作');
+  }
+  if (existing.moveTo && existing.shootTargetId && g.rules?.simultaneous?.allowShootAndMove === false) throw new Error('当前规则不允许同时规划射击和移动');
+  plan.actions[unit.id] = existing;
+}
+
+function publicPlanFor(g, player) {
+  const plan = g.plans?.[player];
+  if (!plan) return { submitted: false, deployments: [], actions: [] };
+  return {
+    submitted: !!plan.submitted,
+    deployments: plan.deployments.map(item => ({ ...item })),
+    actions: Object.values(plan.actions).map(item => ({ ...item, moveTo: item.moveTo ? { ...item.moveTo } : undefined }))
+  };
+}
+
+function randomIndex(length) {
+  return length > 1 ? crypto.randomInt(0, length) : 0;
+}
+
+function resolveSimultaneousRound(g) {
+  if (g.turnMode !== 'simultaneous' || g.phase !== 'planning') return;
+  g.phase = 'resolving';
+  const rules = g.rules?.simultaneous || {};
+  const plans = { attacker: g.plans?.attacker || createSimultaneousPlan(), defender: g.plans?.defender || createSimultaneousPlan() };
+  const deploymentCandidates = [];
+  const deploymentSeen = new Set();
+  for (const player of ['attacker', 'defender']) {
+    const plan = plans[player];
+    const maxima = g.config[player === 'attacker' ? 'attackerMax' : 'defenderMax'] || {};
+    const pendingCounts = {};
+    for (const item of plan.deployments || []) {
+      const definition = unitDefinition(item.type, g);
+      const deploymentKey = `${player}:${item.row},${item.col}`;
+      if (!definition || deploymentSeen.has(deploymentKey)) continue;
+      deploymentSeen.add(deploymentKey);
+      if (!definition.allowedPlayers?.includes(player) || deploymentRowFor(g, player) !== item.row || !validCell(item.row, item.col, g.boardId)) continue;
+      if (unitAt(g, item.row, item.col)) continue;
+      pendingCounts[item.type] = (pendingCounts[item.type] || 0) + 1;
+      if (countType(g, player, item.type) + pendingCounts[item.type] > (maxima[item.type] ?? 0)) { pendingCounts[item.type]--; continue; }
+      if (player === 'attacker' && deploymentCandidates.filter(candidate => candidate.player === player).length >= g.attackerReinforcement) continue;
+      deploymentCandidates.push({ ...item, player });
+    }
+  }
+  const deploymentGroups = new Map();
+  for (const candidate of deploymentCandidates) {
+    const cell = key(candidate.row, candidate.col);
+    const group = deploymentGroups.get(cell) || [];
+    group.push(candidate);
+    deploymentGroups.set(cell, group);
+  }
+  const acceptedDeployments = [];
+  for (const group of deploymentGroups.values()) acceptedDeployments.push(group[randomIndex(group.length)]);
+  for (const deployment of acceptedDeployments) {
+    const unit = createUnit(g, deployment.player, deployment.type, deployment.row, deployment.col);
+    unit.deployedRound = g.round;
+    unit.canAct = false;
+    if (deployment.player === 'attacker') g.attackerReinforcement--;
+    addLog(g, `${deployment.player === 'attacker' ? '进攻方' : '防守方'}部署${unitDefinition(deployment.type, g)?.name || deployment.type}#${unit.id}。`);
+  }
+
+  const unitsAtPlanStart = new Map(g.units.filter(unit => unit.deployedRound !== g.round).map(unit => [unit.id, { ...unit }]));
+  const shots = [];
+  const damage = new Map();
+  const instantKills = new Set();
+  for (const player of ['attacker', 'defender']) {
+    for (const action of Object.values(plans[player].actions || {})) {
+      if (!action.shootTargetId) continue;
+      const shooter = unitsAtPlanStart.get(Number(action.unitId));
+      const target = unitsAtPlanStart.get(Number(action.shootTargetId));
+      if (!shooter || !target || shooter.player !== player || target.player === player) continue;
+      const range = Number(unitDefinition(shooter.type, g)?.range) || 1;
+      if (graphDistance(shooter.row, shooter.col, target.row, target.col, g.boardId) > range) continue;
+      const liveShooter = getUnit(g, shooter.id);
+      if (liveShooter) {
+        liveShooter.shot = true;
+        liveShooter.turnActionStarted = true;
+        liveShooter.lastShotTarget = { row: target.row, col: target.col };
+      }
+      const shot = { attackerId: shooter.id, attackerType: shooter.type, targetId: target.id, targetType: target.type, result: 'hit' };
+      if (immune(g, target, shooter)) shot.result = 'immune';
+      else if (isInstantKill(g, shooter, target)) { shot.result = 'instant_kill'; instantKills.add(target.id); }
+      else damage.set(target.id, (damage.get(target.id) || 0) + 1);
+      shots.push(shot);
+    }
+  }
+  const hitsToDestroy = Number(g.rules?.combat?.hitsToDestroy) || 2;
+  const killedIds = new Set(instantKills);
+  for (const [targetId, amount] of damage) {
+    const target = getUnit(g, targetId);
+    if (!target) continue;
+    target.hits += amount;
+    if (target.hits >= hitsToDestroy) killedIds.add(target.id);
+  }
+  const deadUnits = g.units.filter(unit => killedIds.has(unit.id)).map(unit => ({ ...unit }));
+  g.units = g.units.filter(unit => !killedIds.has(unit.id));
+  for (const shot of shots) {
+    const attackerName = unitDefinition(shot.attackerType, g)?.name || shot.attackerType;
+    const targetName = unitDefinition(shot.targetType, g)?.name || shot.targetType;
+    if (shot.result === 'immune') addLog(g, `${attackerName}#${shot.attackerId}射击${targetName}#${shot.targetId}，未造成伤害。`);
+    else if (shot.result === 'instant_kill') addLog(g, `${attackerName}#${shot.attackerId}击毁${targetName}#${shot.targetId}。`);
+    else addLog(g, `${attackerName}#${shot.attackerId}命中${targetName}#${shot.targetId}。`);
+  }
+  for (const dead of deadUnits) addLog(g, `${unitDefinition(dead.type, g)?.name || dead.type}#${dead.id}被击杀。`);
+  setEvent(g, { type: 'simultaneousResolution', phase: 'shoot', shots, killed: deadUnits });
+  if (checkEnd(g)) { g.phase = 'ended'; return; }
+
+  const occupiedAtMovementStart = new Map(g.units.map(unit => [key(unit.row, unit.col), unit.id]));
+  const candidates = [];
+  for (const player of ['attacker', 'defender']) {
+    for (const action of Object.values(plans[player].actions || {})) {
+      if (!action.moveTo || action.end) continue;
+      if (action.shootTargetId && rules.allowShootAndMove === false) continue;
+      const unit = getUnit(g, Number(action.unitId));
+      if (!unit || unit.player !== player || unit.deployedRound === g.round) continue;
+      const maxSteps = Number(unitDefinition(unit.type, g)?.maxMoveSteps) || 1;
+      const path = legalPath(g, unit, Number(action.moveTo.row), Number(action.moveTo.col), maxSteps);
+      if (!path?.length) continue;
+      const crossesOccupiedOrigin = path.some(([row, col]) => {
+        const occupant = occupiedAtMovementStart.get(key(row, col));
+        return occupant != null && occupant !== unit.id;
+      });
+      if (crossesOccupiedOrigin) continue;
+      candidates.push({ unit, player, path, origin: { row: unit.row, col: unit.col }, failed: false });
+    }
+  }
+  const positions = new Map(g.units.map(unit => [unit.id, { row: unit.row, col: unit.col }]));
+  const occupancy = new Map(g.units.map(unit => [key(unit.row, unit.col), unit.id]));
+  const maxPath = candidates.reduce((max, candidate) => Math.max(max, candidate.path.length), 0);
+  const restoreOrigin = candidate => {
+    candidate.failed = true;
+    const originKey = key(candidate.origin.row, candidate.origin.col);
+    occupancy.set(originKey, candidate.unit.id);
+    positions.set(candidate.unit.id, { ...candidate.origin });
+  };
+  for (let step = 1; step <= maxPath; step++) {
+    const active = candidates.filter(candidate => !candidate.failed && candidate.path.length >= step);
+    if (!active.length) continue;
+    for (const candidate of active) occupancy.delete(key(positions.get(candidate.unit.id).row, positions.get(candidate.unit.id).col));
+    const groups = new Map();
+    for (const candidate of active) {
+      const destination = candidate.path[step - 1];
+      const destinationKey = key(destination[0], destination[1]);
+      const group = groups.get(destinationKey) || [];
+      group.push(candidate);
+      groups.set(destinationKey, group);
+    }
+    for (const [destinationKey, group] of groups) {
+      const blockedBy = occupancy.get(destinationKey);
+      if (blockedBy != null) { group.forEach(restoreOrigin); continue; }
+      const winner = group[randomIndex(group.length)];
+      for (const candidate of group) {
+        if (candidate === winner) continue;
+        restoreOrigin(candidate);
+      }
+      const [row, col] = destinationKey.split(',').map(Number);
+      positions.set(winner.unit.id, { row, col });
+      occupancy.set(destinationKey, winner.unit.id);
+    }
+  }
+  const successfulMoves = [];
+  for (const candidate of candidates) {
+    if (candidate.failed) continue;
+    const position = positions.get(candidate.unit.id);
+    if (!position || (position.row === candidate.origin.row && position.col === candidate.origin.col)) continue;
+    candidate.unit.row = position.row;
+    candidate.unit.col = position.col;
+    candidate.unit.moved = true;
+    candidate.unit.moveSteps = candidate.path.length;
+    candidate.unit.turnActionStarted = true;
+    candidate.unit.canAct = false;
+    successfulMoves.push({ unitId: candidate.unit.id, unitType: candidate.unit.type, from: candidate.origin, to: position, distance: candidate.path.length });
+    addLog(g, `${candidate.player === 'attacker' ? '进攻方' : '防守方'}${unitDefinition(candidate.unit.type, g)?.name || candidate.unit.type}#${candidate.unit.id}移动到(${position.row},${displayCol(position.row, position.col, g.boardId)})。`);
+  }
+  for (const unit of g.units) unit.canAct = false;
+  setEvent(g, { type: 'simultaneousResolution', phase: 'move', moves: successfulMoves, killed: deadUnits });
+  if (checkEnd(g)) { g.phase = 'ended'; return; }
+  g.round++;
+  prepareSimultaneousPlanning(g);
+}
+
+function submitSimultaneousPlan(g, player) {
+  const plan = ensureSimultaneousPlanning(g, player);
+  plan.submitted = true;
+  if (g.plans.attacker?.submitted && g.plans.defender?.submitted) resolveSimultaneousRound(g);
+}
+
+function submitEmptyPlansOnTimeout(room) {
+  const g = room?.game;
+  if (!g || g.turnMode !== 'simultaneous' || g.phase !== 'planning') return false;
+  for (const player of ['attacker', 'defender']) {
+    const plan = simultaneousPlanFor(g, player);
+    if (!plan.submitted) plan.submitted = true;
+  }
+  resolveSimultaneousRound(g);
+  return true;
+}
+
+function scheduleSimultaneousDeadline(room) {
+  if (!room || room.game.turnMode !== 'simultaneous' || room.game.phase !== 'planning') return;
+  if (room.planningTimer) clearTimeout(room.planningTimer);
+  const deadline = Number(room.game.planningDeadline);
+  const delay = Number.isFinite(deadline) ? Math.max(0, deadline - Date.now()) : 0;
+  room.planningTimer = setTimeout(() => {
+    room.planningTimer = null;
+    if (submitEmptyPlansOnTimeout(room)) {
+      broadcast(room);
+      broadcastLobby();
+      scheduleBotTurn(room, BOT_STEP_DELAY);
+    }
+  }, delay || 120000);
+}
+
 function displayCol(row, col, boardId = 'classic') {
   const cell = boardDefinition(boardId).rows.find(item => item.id === row)?.cells.find(item => item.col === col);
   return cell?.displayCol ?? String(col + 1);
@@ -664,14 +1006,16 @@ function displayCol(row, col, boardId = 'classic') {
 function publicState(g, you) {
   const youUnits = g.units.filter(u => u.player === you).map(u => ({
     ...u,
-    legalMoves: moveTargets(g, u),
-    legalShots: shootTargets(g, u).map(t => t.id)
+    selectable: canSelectUnit(g, u, you),
+    legalMoves: canSelectUnit(g, u, you) ? moveTargets(g, u) : [],
+    legalShots: canSelectUnit(g, u, you) ? shootTargets(g, u).map(t => t.id) : []
   }));
+  const visibleUnits = g.units.map(u => ({ ...u, selectable: canSelectUnit(g, u, you) }));
   return {
     round: g.round,
     currentPlayer: g.currentPlayer,
     attackerReinforcement: g.attackerReinforcement,
-    units: g.units,
+    units: visibleUnits,
     myUnits: youUnits,
     state: g.state,
     winner: g.winner,
@@ -691,7 +1035,16 @@ function publicState(g, you) {
     boardId: g.boardId,
     board: BOARD_DEFINITIONS[g.boardId] || boardForVariant(g.variantId),
     botRole: g.botRole,
-    botDifficulty: g.botDifficulty
+    botDifficulty: g.botDifficulty,
+    turnMode: g.turnMode,
+    phase: g.phase,
+    planningDeadline: g.planningDeadline,
+    planning: {
+      you: you === 'attacker' || you === 'defender' ? publicPlanFor(g, you) : { submitted: false, deployments: [], actions: [] },
+      attackerSubmitted: !!g.plans?.attacker?.submitted,
+      defenderSubmitted: !!g.plans?.defender?.submitted
+    },
+    legalDeployments: legalDeployments(g, you)
   };
 }
 
@@ -703,6 +1056,7 @@ function lobbySnapshot() {
       name: room.name,
       hostRole: room.hostRole,
       gameMode: room.gameMode,
+      turnMode: room.game.turnMode,
       variantId: room.variantId,
       variant: GAME_VARIANTS[room.variantId] || GAME_VARIANTS.classic,
       boardId: room.game.boardId,
@@ -733,18 +1087,20 @@ function broadcast(room) {
 }
 
 function defaultConfigForVariant(variantId = 'classic') {
-  const units = definitionsForVariant(variantId).units;
+  const definitions = definitionsForVariant(variantId);
+  const units = definitions.units;
   const attackerMax = {}, defenderMax = {};
   for (const [type, definition] of Object.entries(units)) {
     const defaults = definition.deployLimit || {};
     attackerMax[type] = Number.isFinite(Number(defaults.attacker)) ? Number(defaults.attacker) : 0;
     defenderMax[type] = Number.isFinite(Number(defaults.defender)) ? Number(defaults.defender) : 0;
   }
-  if (variantId === 'classic') {
-    Object.assign(attackerMax, DEFAULT_CONFIG.attackerMax);
-    Object.assign(defenderMax, DEFAULT_CONFIG.defenderMax);
-  }
-  return { reinforcement: DEFAULT_CONFIG.reinforcement, attackerMax, defenderMax, allowDeployAfterAction: DEFAULT_CONFIG.allowDeployAfterAction };
+  return {
+    reinforcement: Number(definitions.rules.configDefaults?.reinforcement) >= 0 ? Number(definitions.rules.configDefaults.reinforcement) : 0,
+    attackerMax,
+    defenderMax,
+    allowDeployAfterAction: definitions.rules.configDefaults?.allowDeployAfterAction !== false
+  };
 }
 
 function sanitizeConfig(raw = {}, variantId = 'classic') {
@@ -766,6 +1122,7 @@ function sanitizeConfig(raw = {}, variantId = 'classic') {
     reinforcement: num(raw.reinforcement, 0, 999999, defaults.reinforcement),
     attackerMax: buildLimits('attacker'),
     defenderMax: buildLimits('defender'),
+    turnMode: raw.turnMode === 'simultaneous' ? 'simultaneous' : 'sequential',
     allowDeployAfterAction: raw.allowDeployAfterAction == null
       ? defaults.allowDeployAfterAction
       : raw.allowDeployAfterAction === true
@@ -967,9 +1324,53 @@ function chooseBotAction(g, player, difficulty) {
   return chooseRanked(choices, difficulty);
 }
 
+function buildBotSimultaneousPlan(g, player, difficulty) {
+  const plan = createSimultaneousPlan();
+  const blockedCells = new Set(g.units.map(unit => key(unit.row, unit.col)));
+  const counts = Object.fromEntries(Object.keys(g.rules?.units || {}).map(type => [type, countType(g, player, type)]));
+  const maxima = g.config[player === 'attacker' ? 'attackerMax' : 'defenderMax'] || {};
+  let reinforcement = g.attackerReinforcement;
+  for (let i = 0; i < BOT_MAX_STEPS_PER_TURN; i++) {
+    const choice = chooseRanked(botDeployChoices(g, player).filter(item => !blockedCells.has(key(item.row, item.col))), difficulty);
+    if (!choice) break;
+    if (counts[choice.type] >= (maxima[choice.type] ?? 0)) break;
+    if (player === 'attacker' && reinforcement <= 0) break;
+    plan.deployments.push({ type: choice.type, row: choice.row, col: choice.col });
+    blockedCells.add(key(choice.row, choice.col));
+    counts[choice.type] = (counts[choice.type] || 0) + 1;
+    if (player === 'attacker') reinforcement--;
+    if (plan.deployments.length >= 50) break;
+  }
+  for (const unit of g.units.filter(item => item.player === player && item.canAct && item.deployedRound !== g.round)) {
+    const action = chooseRanked(botActionChoices(g, player, difficulty).filter(item => item.unitId === unit.id && item.type !== 'stop'), difficulty);
+    if (!action) continue;
+    const item = { unitId: unit.id };
+    if (action.type === 'shoot') item.shootTargetId = action.targetId;
+    if (action.type === 'move') item.moveTo = { row: action.row, col: action.col };
+    if (item.shootTargetId || item.moveTo) plan.actions[unit.id] = item;
+  }
+  plan.submitted = true;
+  return plan;
+}
+
 /* The bot scores only the current legal actions and yields between each one. */
 function scheduleBotTurn(room, delay = BOT_STEP_DELAY) {
   if (!room || !room.botRole || room.game.state !== 'playing') return;
+  if (room.game.turnMode === 'simultaneous') {
+    if (room.game.phase !== 'planning' || room.game.plans?.[room.botRole]?.submitted || room.botTimer) return;
+    room.botTimer = setTimeout(() => {
+      room.botTimer = null;
+      if (rooms.get(room.id) !== room) return;
+      const g = room.game;
+      if (g.turnMode !== 'simultaneous' || g.phase !== 'planning' || g.plans?.[room.botRole]?.submitted) return;
+      g.plans[room.botRole] = buildBotSimultaneousPlan(g, room.botRole, room.botDifficulty);
+      if (g.plans.attacker.submitted && g.plans.defender.submitted) resolveSimultaneousRound(g);
+      broadcast(room);
+      broadcastLobby();
+      scheduleSimultaneousDeadline(room);
+    }, delay);
+    return;
+  }
   if (room.game.currentPlayer !== room.botRole || room.botTimer) return;
   room.botTimer = setTimeout(() => {
     room.botTimer = null;
@@ -1188,6 +1589,7 @@ wss.on('connection', ws => {
           botDeployTurn: null,
           botStepTurn: null,
           botSteps: 0,
+          planningTimer: null,
           game: g,
           players: { attacker: null, defender: null }
         };
@@ -1207,13 +1609,15 @@ wss.on('connection', ws => {
         if (botRole) {
           g.started = true;
           g.state = 'playing';
-          resetTurnForCurrentPlayer(g);
+          g.phase = g.turnMode === 'simultaneous' ? 'planning' : 'playing';
+          if (g.turnMode === 'simultaneous') prepareSimultaneousPlanning(g); else resetTurnForCurrentPlayer(g);
           const difficultyName = { easy: '简单', normal: '普通', hard: '困难' }[botDifficulty];
           addLog(g, `人机对战开始。${difficultyName}机器人控制${botRole === 'attacker' ? '进攻方' : '防守方'}。`);
         }
         send(ws, { type: 'created', id: room.id, name: room.name, role: hostRole, gameMode, variantId, boardId: g.boardId });
         broadcast(room);
         broadcastLobby();
+        scheduleSimultaneousDeadline(room);
         scheduleBotTurn(room);
         return;
       }
@@ -1238,11 +1642,13 @@ wss.on('connection', ws => {
           if (room.players.attacker && room.players.defender && !room.game.started) {
             room.game.started = true;
             room.game.state = 'playing';
-            resetTurnForCurrentPlayer(room.game);
-            addLog(room.game, `两名玩家已连接。${room.game.currentPlayer === 'attacker' ? '进攻方' : '防守方'}先手。`);
+            room.game.phase = room.game.turnMode === 'simultaneous' ? 'planning' : 'playing';
+            if (room.game.turnMode === 'simultaneous') prepareSimultaneousPlanning(room.game); else resetTurnForCurrentPlayer(room.game);
+            addLog(room.game, room.game.turnMode === 'simultaneous' ? '两名玩家已连接，双方进入规划阶段。' : `两名玩家已连接。${room.game.currentPlayer === 'attacker' ? '进攻方' : '防守方'}先手。`);
           }
           broadcast(room);
           broadcastLobby();
+          scheduleSimultaneousDeadline(room);
           return;
         }
 
@@ -1283,6 +1689,8 @@ wss.on('connection', ws => {
         ws.surrenderClicks = 0;
         ws.surrenderWindowStartedAt = 0;
         g.state = 'ended';
+        g.phase = 'ended';
+        if (room.planningTimer) { clearTimeout(room.planningTimer); room.planningTimer = null; }
         g.winner = player === 'attacker' ? 'defender' : 'attacker';
         g.winnerReason = 'surrender';
         addLog(g, `${player === 'attacker' ? '进攻方' : '防守方'}投降，${g.winner === 'attacker' ? '进攻方' : '防守方'}获胜。`);
@@ -1294,7 +1702,13 @@ wss.on('connection', ws => {
 
       if (player === 'spectator' && m.type !== 'leaveRoom') throw new Error('观战中不能进行游戏操作');
 
-      if (m.type === 'deploy') deploy(g, player, m.unitType, Number(m.row), Number(m.col));
+      if (g.turnMode === 'simultaneous' && ['deploy', 'move', 'shoot', 'endUnit', 'endTurn'].includes(m.type)) {
+        if (m.type === 'deploy') planSimultaneousDeploy(g, player, String(m.unitType || ''), Number(m.row), Number(m.col));
+        else if (m.type === 'move') planSimultaneousAction(g, player, 'move', Number(m.unitId), Number(m.row), Number(m.col));
+        else if (m.type === 'shoot') planSimultaneousAction(g, player, 'shoot', Number(m.unitId), null, null, Number(m.targetId));
+        else if (m.type === 'endUnit') planSimultaneousAction(g, player, 'endUnit', Number(m.unitId));
+        else if (m.type === 'endTurn') submitSimultaneousPlan(g, player);
+      } else if (m.type === 'deploy') deploy(g, player, m.unitType, Number(m.row), Number(m.col));
       else if (m.type === 'move') move(g, player, Number(m.unitId), Number(m.row), Number(m.col));
       else if (m.type === 'shoot') shoot(g, player, Number(m.unitId), Number(m.targetId));
       else if (m.type === 'endUnit') endUnit(g, player, Number(m.unitId));
@@ -1341,6 +1755,10 @@ wss.on('connection', ws => {
           clearTimeout(room.botTimer);
           room.botTimer = null;
         }
+        if (room.planningTimer) {
+          clearTimeout(room.planningTimer);
+          room.planningTimer = null;
+        }
         ws.roomId = null;
         ws.role = null;
         ws.spectating = false;
@@ -1353,6 +1771,7 @@ wss.on('connection', ws => {
       else throw new Error('未知操作');
 
       broadcast(room);
+      scheduleSimultaneousDeadline(room);
       scheduleBotTurn(room);
     } catch (e) {
       send(ws, { type: 'error', code: e.code || null, message: e.message || String(e) });
@@ -1370,6 +1789,10 @@ wss.on('connection', ws => {
     if (room.botTimer) {
       clearTimeout(room.botTimer);
       room.botTimer = null;
+    }
+    if (room.planningTimer) {
+      clearTimeout(room.planningTimer);
+      room.planningTimer = null;
     }
     if (room.game.state !== 'ended' && room.game.started) {
       room.game.state = 'ended';
@@ -1412,8 +1835,17 @@ module.exports = {
     normalizeVariantId,
     deploymentRowFor,
     createUnit,
+    shoot,
     normalizeBotDifficulty,
     chooseBotDeployment,
-    chooseBotAction
+    chooseBotAction,
+    createSimultaneousPlan,
+    serializePlan,
+    deserializePlan,
+    prepareSimultaneousPlanning,
+    planSimultaneousDeploy,
+    planSimultaneousAction,
+    submitSimultaneousPlan,
+    resolveSimultaneousRound
   }
 };

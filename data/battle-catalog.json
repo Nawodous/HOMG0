@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "battles": [
+    {
+      "id": "classic",
+      "manifest": {
+        "path": "battles/classic/battle.json",
+        "id": "classic",
+        "contentVersion": 4
+      },
+      "enabled": true
+    },
+    {
+      "id": "breakout",
+      "manifest": {
+        "path": "battles/breakout/battle.json",
+        "id": "breakout",
+        "contentVersion": 8
+      },
+      "enabled": true
+    }
+  ]
+}

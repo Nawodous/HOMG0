@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "breakout",
+  "contentVersion": 8,
+  "name": "突围",
+  "category": "battle",
+  "enabled": true,
+  "engine": "classic",
+  "supportsAi": true,
+  "resources": {
+    "terrainTypes": {
+      "path": "terrain-types/classic-terrain.json",
+      "id": "classic-terrain",
+      "contentVersion": 1
+    },
+    "unitTypes": {
+      "path": "unit-types/classic-units.json",
+      "id": "classic-units",
+      "contentVersion": 1
+    },
+    "map": {
+      "path": "maps/breakout.json",
+      "id": "breakout",
+      "contentVersion": 4
+    },
+    "combatRules": {
+      "path": "combat-rules/classic-combat.json",
+      "id": "classic-combat",
+      "contentVersion": 1
+    },
+    "gameRules": {
+      "path": "game-rules/classic-game.json",
+      "id": "classic-game",
+      "contentVersion": 3
+    },
+    "aiProfile": {
+      "path": "ai-profiles/light-search.json",
+      "id": "light-search",
+      "contentVersion": 1
+    },
+    "scenarioRules": {
+      "path": "battles/breakout/scenario-rules.json",
+      "id": "breakout-scenario",
+      "contentVersion": 7
+    }
+  }
+}

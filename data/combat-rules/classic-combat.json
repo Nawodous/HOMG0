@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": "classic-combat",
+  "contentVersion": 1,
+  "requires": {
+    "terrainTypes": "classic-terrain",
+    "unitTypes": "classic-units"
+  },
+  "unitProfiles": {
+    "infantry": {
+      "move": 1,
+      "range": 2,
+      "maxMoveSteps": 1,
+      "actionRules": { "canMoveAfterShot": true, "canShootAfterMove": true, "endWhen": "movedAndShot" },
+      "immuneFrom": []
+    },
+    "antiTank": {
+      "move": 1,
+      "range": 3,
+      "maxMoveSteps": 1,
+      "actionRules": { "canMoveAfterShot": false, "canShootAfterMove": false, "endWhen": "movedOrShot" },
+      "immuneFrom": []
+    },
+    "machineGun": {
+      "move": 2,
+      "range": 2,
+      "maxMoveSteps": 2,
+      "actionRules": { "canMoveAfterShot": true, "canShootAfterMove": true, "endWhen": "maxMoveStepsAndShot" },
+      "immuneFrom": ["infantry", "machineGun"]
+    }
+  },
+  "terrainProfiles": {
+    "plain": {
+      "passableUnits": ["infantry", "antiTank", "machineGun"]
+    },
+    "fortress": {
+      "passableUnits": ["infantry", "antiTank"],
+      "attackImmuneFrom": ["infantry", "machineGun"]
+    },
+    "stairs": {
+      "passableUnits": ["infantry"],
+      "specialEntry": "infantry-row4-to-row3"
+    }
+  },
+  "combat": {
+    "hitsToDestroy": 2,
+    "instantKill": {
+      "attackerTypes": ["antiTank"],
+      "targetTypes": ["machineGun"],
+      "terrainTypes": ["fortress"],
+      "reason": "anti_tank_direct_kill"
+    }
+  }
+}

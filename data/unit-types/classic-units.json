@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "classic-units",
+  "contentVersion": 1,
+  "unitTypes": {
+    "infantry": {
+      "name": "步兵",
+      "short": "步",
+      "icon": "/icons/infantry.svg"
+    },
+    "antiTank": {
+      "name": "反坦克炮",
+      "short": "炮",
+      "icon": "/icons/anti-tank.svg"
+    },
+    "machineGun": {
+      "name": "机枪车",
+      "short": "机",
+      "icon": "/icons/machine-gun.svg"
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "id": "light-search",
+  "contentVersion": 1,
+  "algorithm": "bounded-lookahead",
+  "requires": {
+    "terrainTypes": "classic-terrain",
+    "unitTypes": "classic-units"
+  },
+  "defaultDifficulty": "normal",
+  "execution": {
+    "stepDelayMs": 550,
+    "maxStepsPerTurn": 100,
+    "maxDeploymentsPerPlan": 50
+  },
+  "evaluation": {
+    "unitProfiles": {
+      "infantry": { "role": "infantry", "value": 45 },
+      "antiTank": { "role": "antiTank", "value": 85 },
+      "machineGun": { "role": "machineGun", "value": 70 }
+    },
+    "terrainScores": { "fortress": 38, "stairs": 20 },
+    "attackerThreatScoresByGoalDistance": { "1": 360, "2": 150 },
+    "roleBonuses": {
+      "antiTankVsMachineGun": 150,
+      "antiTankVsFortress": 120,
+      "machineGunWithoutAntiTank": 25
+    }
+  },
+  "difficulties": {
+    "easy": {
+      "searchDepth": 1,
+      "maxRootCandidates": 8,
+      "maxBranching": 1,
+      "maxNodes": 8,
+      "timeBudgetMs": 3,
+      "futureDiscount": 0,
+      "topChoices": 4,
+      "nearBestWindow": 80,
+      "dangerWeight": 0.25,
+      "mobilityWeight": 0.5
+    },
+    "normal": {
+      "searchDepth": 2,
+      "maxRootCandidates": 10,
+      "maxBranching": 3,
+      "maxNodes": 24,
+      "timeBudgetMs": 6,
+      "futureDiscount": 0.35,
+      "topChoices": 2,
+      "nearBestWindow": 12,
+      "dangerWeight": 0.75,
+      "mobilityWeight": 1
+    },
+    "hard": {
+      "searchDepth": 2,
+      "maxRootCandidates": 14,
+      "maxBranching": 5,
+      "maxNodes": 48,
+      "timeBudgetMs": 12,
+      "futureDiscount": 0.45,
+      "topChoices": 1,
+      "nearBestWindow": 0,
+      "dangerWeight": 1.2,
+      "mobilityWeight": 1.25
+    }
+  }
+}

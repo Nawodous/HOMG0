@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
 <title>HOMG0 局域网联机 Demo</title>
 <style>
 *{box-sizing:border-box}
@@ -10,7 +12,7 @@
   --bg:#0d1117;--panel:#171d25;--panel2:#1e2631;--line:#303b4b;--text:#e9eef6;
   --muted:#8f9db0;--green:#59ce91;--red:#df7178;--gold:#f2cb68;--blue:#65a1dc;
 }
-html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif}
+html,body{margin:0;min-height:100%;max-width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif}
 button,input{font:inherit}
 button{cursor:pointer}
 .hidden{display:none!important}
@@ -18,11 +20,11 @@ button{cursor:pointer}
 .topbar{height:72px;padding:0 22px;display:flex;align-items:center;justify-content:space-between;background:#151b23;border-bottom:1px solid #2a3442}
 .title{font-size:21px;font-weight:800}.subtitle{font-size:12px;color:var(--muted);margin-top:4px}
 .top-actions{display:flex;align-items:center;gap:8px}.settings-btn{width:36px;height:36px;border:1px solid #3a485b;border-radius:9px;background:#222c39;color:#e5edf6;font-size:18px;cursor:pointer}.settings-btn:hover{background:#2c3848}.pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pill{padding:7px 12px;border-radius:999px;background:#293445;font-size:12px}.pill.mine{background:#495d92}.pill.enemy{background:#75424d}.pill.good{background:#2d6a50}
-.main{display:grid;grid-template-columns:minmax(720px,1fr) 420px;min-height:calc(100vh - 72px)}
-  .board-area{position:relative;padding:20px;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;overflow:auto}
-.board{position:relative;width:var(--board-width,790px);height:var(--board-height,720px);min-width:var(--board-width,790px)}.fx-layer{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visible}.fx-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}.fx-arrow{transform-box:fill-box;transform-origin:center;animation:fxArrowIn 1s ease-out forwards}.fx-arrow.move{stroke:#58a6ff;fill:#58a6ff;filter:drop-shadow(0 0 7px #58a6ff)}.fx-arrow.attack{stroke:#f2cb68;fill:#f2cb68;filter:drop-shadow(0 0 5px #f2cb68)}.corpse{position:absolute;width:54px;height:36px;border-radius:50%;border:2px solid #4e5965;background:radial-gradient(ellipse at center,#555f68 0%,#303740 60%,#20262c 100%);box-shadow:0 4px 10px #000a;transform:translate(-50%,-50%) rotate(-18deg);animation:corpseFade 1s ease-out forwards;z-index:19}.corpse::after{content:'☠';position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);font-size:20px;color:#9aa4ae;text-shadow:0 1px 3px #000}.corpse .corpse-label{position:absolute;left:50%;top:100%;transform:translate(-50%,4px);font-size:9px;color:#7f8993;white-space:nowrap}.grid{position:absolute;top:var(--grid-top,48px);right:var(--grid-right,38px);bottom:var(--grid-bottom,24px);left:var(--grid-left,38px)}
-.row{position:absolute;left:0;width:100%;display:flex;justify-content:center;gap:var(--cell-gap,12px)}
-.cell{position:relative;width:var(--cell-width,116px);height:var(--cell-height,90px);flex:0 0 auto;border:2px solid #394555;border-radius:13px;background:linear-gradient(145deg,#222a35,#1d242e);cursor:pointer;transition:none}
+.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);width:100%;min-width:0;min-height:calc(100vh - 72px)}
+  .board-area{position:relative;min-width:0;max-width:100%;padding:20px;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;overflow:hidden}
+.board-stage{position:relative;max-width:100%;width:var(--scaled-board-width,0px);height:var(--scaled-board-height,0px);flex:0 0 auto;overflow:hidden}.board{position:absolute;left:0;top:0;width:var(--board-width,790px);height:var(--board-height,720px);transform:scale(var(--board-scale,1));transform-origin:top left}.fx-layer{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visible}.fx-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}.fx-arrow{transform-box:fill-box;transform-origin:center;animation:fxArrowIn 1s ease-out forwards}.fx-arrow.move{stroke:#58a6ff;fill:#58a6ff;filter:drop-shadow(0 0 7px #58a6ff)}.fx-arrow.attack{stroke:#f2cb68;fill:#f2cb68;filter:drop-shadow(0 0 5px #f2cb68)}.corpse{position:absolute;width:54px;height:36px;border-radius:50%;border:2px solid #4e5965;background:radial-gradient(ellipse at center,#555f68 0%,#303740 60%,#20262c 100%);box-shadow:0 4px 10px #000a;transform:translate(-50%,-50%) rotate(-18deg);animation:corpseFade 1s ease-out forwards;z-index:19}.corpse::after{content:'☠';position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);font-size:20px;color:#9aa4ae;text-shadow:0 1px 3px #000}.corpse .corpse-label{position:absolute;left:50%;top:100%;transform:translate(-50%,4px);font-size:9px;color:#7f8993;white-space:nowrap}.grid{position:absolute;top:var(--grid-top,48px);right:var(--grid-right,38px);bottom:var(--grid-bottom,24px);left:var(--grid-left,38px)}
+.row{position:absolute;left:0;width:100%;height:var(--cell-height,90px);display:block;pointer-events:none}
+.cell{position:relative;width:var(--cell-width,116px);height:var(--cell-height,90px);flex:0 0 auto;border:2px solid #394555;border-radius:13px;background:linear-gradient(145deg,#222a35,#1d242e);cursor:pointer;transition:none;pointer-events:auto}
 .cell{background:var(--terrain-background,linear-gradient(145deg,#222a35,#1d242e));border-color:var(--terrain-border,#394555)}
 .parameter-group{margin-top:12px;padding:10px;border:1px solid #303d4f;border-radius:8px;background:#10161e}.parameter-group-title{font-size:11px;font-weight:800;color:#cbd5e2;margin-bottom:8px}.parameter-group .form-grid{gap:8px}
 .role-card.disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.35)}
@@ -32,9 +34,9 @@ button{cursor:pointer}
 .cell.deployable{box-shadow:inset 0 0 0 3px rgba(101,161,220,.8);background:linear-gradient(145deg,#24354a,#202c3c)}
 .fort{background:linear-gradient(145deg,#4c3924,#362b1d);border-color:#a98042}.stairs{background:linear-gradient(145deg,#30375a,#282f4b);border-color:#777fc2}
 .coord{position:absolute;right:8px;top:6px;color:#68778c;font-size:10px}.terrain{position:absolute;left:8px;top:6px;color:#94a1b4;font-size:10px}.symbol{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);font-size:25px;opacity:.6}
-.unit{position:absolute;left:50%;top:56%;transform:translate(-50%,-50%);width:56px;height:56px;border:3px solid #d8e0ea;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;box-shadow:0 7px 18px #0008;z-index:4;pointer-events:none}.unit .unit-svg{width:31px;height:31px;display:block;filter:drop-shadow(0 1px 2px #0008)}.unit .unit-svg *{vector-effect:non-scaling-stroke}.unit .external-unit-icon{object-fit:contain}.unit .unit-icon-fallback{font-size:22px;font-weight:900;line-height:1}.unit .mini{pointer-events:none}
-.unit.a{background:#98414d}.unit.d{background:#376e9c}.unit.planned{opacity:.52;border-style:dashed}.unit.new{box-shadow:0 0 0 3px #f2cb6858,0 7px 18px #0008}.unit.sel{outline:4px solid var(--gold);outline-offset:3px}
-.unit .mini{position:absolute;bottom:-10px;display:flex;gap:3px}.badge{min-width:19px;height:19px;border-radius:6px;padding:0 4px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;border:1px solid rgba(255,255,255,.18);background:#232c38}
+.unit{position:absolute;left:50%;top:56%;transform:translate(-50%,-50%);width:var(--unit-model-size,56px);height:var(--unit-model-size,56px);border:var(--unit-model-border,3px) solid #d8e0ea;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:var(--unit-model-font,17px);box-shadow:0 var(--unit-model-shadow-y,7px) var(--unit-model-shadow-blur,18px) #0008;z-index:4;pointer-events:none}.unit .unit-svg{width:var(--unit-model-icon,31px);height:var(--unit-model-icon,31px);display:block;filter:drop-shadow(0 var(--unit-model-icon-shadow,1px) var(--unit-model-icon-shadow-blur,2px) #0008)}.unit .external-unit-icon{object-fit:contain}.unit .unit-icon-fallback{font-size:var(--unit-model-fallback-font,22px);font-weight:900;line-height:1}.unit .mini{pointer-events:none}
+.unit.a{background:#98414d}.unit.d{background:#376e9c}.unit.planned{opacity:.52;border-style:dashed}.unit.new{box-shadow:0 0 0 var(--unit-model-border,3px) #f2cb6858,0 var(--unit-model-shadow-y,7px) var(--unit-model-shadow-blur,18px) #0008}.unit.sel{outline:var(--unit-model-outline,4px) solid var(--gold);outline-offset:var(--unit-model-border,3px)}
+.unit .mini{position:absolute;bottom:var(--unit-model-mini-bottom,-10px);display:flex;gap:var(--unit-model-badge-gap,3px)}.badge{min-width:var(--unit-model-badge-size,19px);height:var(--unit-model-badge-size,19px);border-radius:var(--unit-model-badge-radius,6px);padding:0 var(--unit-model-badge-padding,4px);display:inline-flex;align-items:center;justify-content:center;font-size:var(--unit-model-badge-font,9px);font-weight:700;border:var(--unit-model-badge-border,1px) solid rgba(255,255,255,.18);background:#232c38}
 .badge.yes{background:#2d6a50}.badge.no{background:#323b49;color:#7d8998}.badge.hit{background:#8d3d47;color:#fff}.badge.fresh{background:#7c6732;color:#ffe5a1}
 .anim-move{animation:moveFlash .5s ease}.anim-shot{animation:shotFlash .5s ease}.anim-hit{animation:hitFlash .55s ease}.anim-deploy{animation:deployPulse .7s ease}.anim-death{animation:deathFlash .65s ease}.impact{position:absolute;inset:12px;border-radius:50%;border:3px solid #f17c83;animation:impactFlash .65s ease;pointer-events:none;z-index:3}.impact::after{content:'×';position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);font-size:36px;font-weight:900;color:#f7a2a7;text-shadow:0 0 14px #b94750}.muzzle{position:absolute;width:16px;height:16px;border-radius:50%;background:#ffe397;box-shadow:0 0 22px 8px #f2cb6870;left:50%;top:35%;transform:translate(-50%,-50%);animation:muzzleFlash .35s ease;pointer-events:none;z-index:6}@keyframes impactFlash{0%{opacity:0;transform:scale(.4)}25%{opacity:1;transform:scale(1.15)}100%{opacity:0;transform:scale(1.45)}}@keyframes muzzleFlash{0%{opacity:0;transform:translate(-50%,-50%) scale(.3)}30%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(2.2)}}
 @keyframes moveFlash{0%{transform:translate(-50%,-50%) scale(.8);filter:brightness(1)}45%{transform:translate(-50%,-50%) scale(1.16);filter:brightness(1.5)}100%{transform:translate(-50%,-50%) scale(1)}}
@@ -42,16 +44,16 @@ button{cursor:pointer}
 @keyframes hitFlash{0%{transform:translate(-50%,-50%)}20%{transform:translate(calc(-50% - 6px),-50%)}40%{transform:translate(calc(-50% + 6px),-50%)}60%{transform:translate(calc(-50% - 4px),-50%)}80%{transform:translate(calc(-50% + 3px),-50%)}100%{transform:translate(-50%,-50%)}}
 @keyframes deployPulse{0%{transform:translate(-50%,-50%) scale(.5);opacity:.1}55%{transform:translate(-50%,-50%) scale(1.13);opacity:1}100%{transform:translate(-50%,-50%) scale(1)}}
 @keyframes deathFlash{0%{opacity:1}40%{opacity:.85;filter:grayscale(1) brightness(1.8)}100%{opacity:0}}@keyframes fxArrowIn{0%{opacity:0;transform:scale(.9)}12%{opacity:1;transform:scale(1)}78%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1)}}@keyframes corpseFade{0%{opacity:0;transform:translate(-50%,-50%) rotate(-18deg) scale(.7)}15%{opacity:1;transform:translate(-50%,-50%) rotate(-18deg) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) rotate(-18deg) scale(.94)}}
-.side{background:#121820;border-left:1px solid #2a3442;padding:14px;display:flex;flex-direction:column;gap:11px;overflow:auto}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.pt{font-size:13px;font-weight:800;margin-bottom:10px}.hint{font-size:12px;line-height:1.6;color:#aeb9c7}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px}.stat{background:#121820;border-radius:8px;padding:8px}.sl{font-size:10px;color:#7f8da0}.sv{margin-top:3px;font-size:13px;font-weight:800}
+.side{min-width:0;background:#121820;border-left:1px solid #2a3442;padding:14px;display:flex;flex-direction:column;gap:11px;overflow:auto}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.pt{font-size:13px;font-weight:800;margin-bottom:10px}.hint{font-size:12px;line-height:1.6;color:#aeb9c7}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px}.stat{background:#121820;border-radius:8px;padding:8px}.sl{font-size:10px;color:#7f8da0}.sv{margin-top:3px;font-size:13px;font-weight:800}.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.status-grid .stat{padding:7px 8px;min-width:0}.status-wide{grid-column:1/-1}.status-text{font-size:11px;font-weight:500;line-height:1.45;overflow-wrap:anywhere}.status-grid .config-summary{margin-top:3px;line-height:1.45}
 .config-summary{font-size:11px;line-height:1.7;color:#aeb8c6}.unit-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.unit-buttons button{border:0;border-radius:8px;padding:9px 4px;background:#2c3747;color:#e1e7ef}.unit-buttons button.active{background:#5d5d9d}.unit-buttons button:disabled{opacity:.35;cursor:not-allowed}
 .selection{min-height:80px;font-size:12px;line-height:1.7;color:#bdc7d4}.rowbtn{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}.btn{border:0;border-radius:8px;padding:10px;background:#303c4c;color:#fff}.btn.primary{background:#5969a6}.btn.danger{background:#873f49}.btn:disabled{opacity:.35;cursor:not-allowed}
 .unit-list{display:flex;flex-direction:column;gap:6px;max-height:290px;overflow:auto}.my-units-body.collapsed{display:none}.collapsible-head{width:100%;display:flex;align-items:center;justify-content:space-between;border:0;background:transparent;color:inherit;padding:0;text-align:left}.collapsible-head .chev{color:#8f9bad;font-size:12px}.urow{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;background:#121820;border-radius:8px;padding:7px}.uicon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}.uicon.a{background:#863b47}.uicon.d{background:#376789}.uinfo{font-size:11px}.uname{font-size:12px;font-weight:700}.subline{color:#8492a4;margin-top:2px}.ustate{display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end;max-width:155px}.log{height:180px;overflow:auto;background:#10161d;border-radius:8px;padding:8px;font-size:10px;line-height:1.65;color:#aab5c3}.log.collapsed{display:none}.log-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.log-toggle-icon{width:26px;height:26px;padding:0;border:0;border-radius:7px;background:#222c39;color:#dfe7f1;display:flex;align-items:center;justify-content:center}.log-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;border:0;border-radius:8px;padding:8px 10px;background:#222c39;color:#dfe7f1;font-size:12px}.log-toggle span{color:#8f9bad}.turn-start-overlay{position:fixed;top:72px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(4,8,13,.34);pointer-events:none;opacity:0;z-index:90}
 .game-modal{position:fixed;top:72px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(4,8,13,.48);z-index:120}.game-modal.hidden{display:none}.game-modal-card{width:min(420px,88vw);padding:22px;border:1px solid #4d5d76;border-radius:14px;background:#1b2430;box-shadow:0 22px 70px #000b;text-align:center}.game-modal-title{font-size:18px;font-weight:900}.game-modal-text{margin:10px 0 18px;color:#aeb9c7;font-size:12px;line-height:1.7}.game-modal-card .btn{min-width:120px}
 .chat-top,.chat-bottom{position:absolute;z-index:110;pointer-events:none;width:min(430px,42%);display:flex;flex-direction:column;gap:4px;font-size:22px;line-height:1.35}.chat-top{left:20px;top:20px;align-items:flex-start}.chat-bottom{right:20px;bottom:20px;align-items:flex-end}.chat-line{color:#eef3f9;text-shadow:0 2px 6px #000;opacity:0;animation:chatTextIn .15s ease-out forwards,chatTextOut .45s ease-in 1.55s forwards}.chat-line.mine{color:#dce8ff}.chat-line.enemy{color:#ffe1e4}.chat-dock{display:flex;gap:7px;padding:0}.chat-dock input{flex:1;min-width:0;border:1px solid #3c4a5e;border-radius:8px;padding:9px 11px;background:#0e141b;color:#fff;outline:none}.chat-dock button{border:0;border-radius:8px;padding:9px 15px;background:#5969a6;color:#fff}.chat-dock button:disabled{opacity:.4;cursor:not-allowed}@keyframes chatTextIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}@keyframes chatTextOut{to{opacity:0;transform:translateY(-4px)}}
 .turn-start-overlay.show{animation:turnStartOverlay 1s ease-out forwards}.turn-start-card{min-width:280px;padding:22px 34px;border:1px solid #64769a;border-radius:16px;background:rgba(25,33,45,.94);box-shadow:0 18px 55px #0008;text-align:center}.turn-start-label{font-size:13px;color:#99a7ba;letter-spacing:3px}.turn-start-name{margin-top:6px;font-size:30px;font-weight:900;text-shadow:0 0 18px rgba(255,255,255,.16)}@keyframes turnStartOverlay{0%{opacity:0}15%{opacity:1}75%{opacity:1}100%{opacity:0}}
-  .login{position:fixed;top:0;left:0;right:0;bottom:0;background:#081018;display:flex;align-items:center;justify-content:center;z-index:100}.card{width:min(560px,94vw);max-height:92vh;overflow:auto;background:#1b232e;border:1px solid #3a485c;border-radius:16px;padding:22px;box-shadow:0 25px 70px #0009}.card h1{margin:0;font-size:24px}.card p{font-size:12px;line-height:1.75;color:#aab5c4}.sep{height:1px;background:#2d3745;margin:16px 0}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;color:#99a6b7}.field input,.field select{padding:10px;border-radius:8px;border:1px solid #3c4a5f;background:#10161e;color:#fff}.section-title{font-size:12px;font-weight:800;margin:15px 0 8px}.role-choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}.role-card{padding:11px;border:1px solid #39475a;border-radius:9px;background:#141a22;cursor:pointer}.role-card.active{border-color:#7084bd;background:#29334b}.role-card strong{display:block;font-size:13px}.role-card span{font-size:10px;color:#8f9bad}.game-parameters{margin-top:15px;border:1px solid #39475a;border-radius:8px;background:#141a22}.game-parameters summary{padding:12px 14px;cursor:pointer;font-size:12px;font-weight:800;list-style-position:inside}.game-parameters[open] summary{border-bottom:1px solid #39475a}.game-parameters-body{padding:12px 14px 14px}.parameter-toggle{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:11px;color:#c4ceda;cursor:pointer}.codebox{margin-top:12px;border:1px dashed #5d7196;border-radius:10px;padding:10px;text-align:center;background:#172134}.room-code{font-size:24px;font-weight:900;letter-spacing:5px;color:#f2cb68}.room-list{display:flex;flex-direction:column;gap:8px;max-height:45vh;overflow:auto}.room-item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px;border:1px solid #39475a;border-radius:10px;background:#141a22}.room-info strong{display:block;font-size:13px}.room-meta{margin-top:3px;font-size:10px;color:#8f9bad;line-height:1.5}.room-item .btn{padding:8px 12px;min-width:76px}.settings-box{width:min(460px,92vw)}.setting-row{margin:14px 0}.setting-row label{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#c5cfdb}.setting-row input[type=range]{width:100%;margin-top:8px}.upload-row{display:flex;gap:8px;align-items:center}.upload-row input[type=file]{flex:1;min-width:0;font-size:11px;color:#aab5c4}.settings-note{font-size:10px;color:#8190a3;line-height:1.6;margin-top:8px}.result-banner{width:min(var(--board-width,790px),100%);margin-top:12px;padding:14px 18px;border:1px solid #687b9b;border-radius:12px;background:linear-gradient(135deg,#202c3d,#18212d);box-shadow:0 10px 28px #0007;text-align:center}.result-banner.win-attacker{border-color:#9b7651;background:linear-gradient(135deg,#493622,#28251f)}.result-banner.win-defender{border-color:#577b9a;background:linear-gradient(135deg,#243c50,#202a36)}.result-banner-title{font-size:21px;font-weight:900}.result-banner-detail{margin-top:4px;color:#c6d0dc;font-size:12px;line-height:1.6}.room-leave{width:100%;margin-top:7px}
-@media(max-width:1180px){.main{grid-template-columns:1fr}.side{border-left:0;border-top:1px solid #2a3442}.board-area{justify-content:flex-start}}
+  .login{position:fixed;top:0;left:0;right:0;bottom:0;background:#081018;display:flex;align-items:center;justify-content:center;z-index:100}.card{width:min(560px,94vw);max-height:92vh;overflow:auto;background:#1b232e;border:1px solid #3a485c;border-radius:16px;padding:22px;box-shadow:0 25px 70px #0009}.card h1{margin:0;font-size:24px}.card p{font-size:12px;line-height:1.75;color:#aab5c4}.sep{height:1px;background:#2d3745;margin:16px 0}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;color:#99a6b7}.field input,.field select{padding:10px;border-radius:8px;border:1px solid #3c4a5f;background:#10161e;color:#fff}.section-title{font-size:12px;font-weight:800;margin:15px 0 8px}.role-choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}.role-card{padding:11px;border:1px solid #39475a;border-radius:9px;background:#141a22;cursor:pointer}.role-card.active{border-color:#7084bd;background:#29334b}.role-card strong{display:block;font-size:13px}.role-card span{font-size:10px;color:#8f9bad}.game-parameters{margin-top:15px;border:1px solid #39475a;border-radius:8px;background:#141a22}.game-parameters summary{padding:12px 14px;cursor:pointer;font-size:12px;font-weight:800;list-style-position:inside}.game-parameters[open] summary{border-bottom:1px solid #39475a}.game-parameters-body{padding:12px 14px 14px}.parameter-toggle{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:11px;color:#c4ceda;cursor:pointer}.codebox{margin-top:12px;border:1px dashed #5d7196;border-radius:10px;padding:10px;text-align:center;background:#172134}.room-code{font-size:24px;font-weight:900;letter-spacing:5px;color:#f2cb68}.room-list{display:flex;flex-direction:column;gap:8px;max-height:45vh;overflow:auto}.room-item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px;border:1px solid #39475a;border-radius:10px;background:#141a22}.room-info strong{display:block;font-size:13px}.room-meta{margin-top:3px;font-size:10px;color:#8f9bad;line-height:1.5}.room-item .btn{padding:8px 12px;min-width:76px}.settings-box{width:min(460px,92vw)}.setting-row{margin:14px 0}.setting-row label{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#c5cfdb}.setting-row input[type=range]{width:100%;margin-top:8px}.upload-row{display:flex;gap:8px;align-items:center}.upload-row input[type=file]{flex:1;min-width:0;font-size:11px;color:#aab5c4}.settings-note{font-size:10px;color:#8190a3;line-height:1.6;margin-top:8px}.result-banner{width:min(var(--scaled-board-width,790px),100%);margin-top:12px;padding:14px 18px;border:1px solid #687b9b;border-radius:12px;background:linear-gradient(135deg,#202c3d,#18212d);box-shadow:0 10px 28px #0007;text-align:center}.result-banner.win-attacker{border-color:#9b7651;background:linear-gradient(135deg,#493622,#28251f)}.result-banner.win-defender{border-color:#577b9a;background:linear-gradient(135deg,#243c50,#202a36)}.result-banner-title{font-size:21px;font-weight:900}.result-banner-detail{margin-top:4px;color:#c6d0dc;font-size:12px;line-height:1.6}.room-leave{width:100%;margin-top:7px}
+@media(max-width:1180px){.main{grid-template-columns:minmax(0,1fr)}.side{border-left:0;border-top:1px solid #2a3442}.board-area{justify-content:flex-start}}
 
 /* 手机端响应式：桌面端样式保持不变 */
 @media(max-width:700px){
@@ -63,7 +65,7 @@ button{cursor:pointer}
   .pill{padding:5px 8px;font-size:10px;white-space:nowrap}
   .main{display:flex;flex-direction:column;min-height:calc(100vh - 58px)}
   .board-area{width:100%;padding:8px 0 4px;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;overflow:hidden;position:relative}
-  .board{flex:0 0 var(--board-height,0px);transform:scale(var(--mobile-board-scale,1));transform-origin:top center;margin:0;}
+  .board-stage{flex:0 0 auto}
   .side{width:100%;max-height:none;border:0;border-top:1px solid #2a3442;padding:10px;gap:9px;overflow:visible}
   .panel{padding:10px;border-radius:10px}
   .pt{font-size:13px;margin-bottom:8px}
@@ -108,8 +110,7 @@ button{cursor:pointer}
 <div id="login" class="login">
   <div class="card">
     <div id="lobbyView">
-      <h1>HOMG0 局域网大厅</h1>
-      <p>进入大厅后，可以查看当前等待中的房间。创建房间的一方负责选择阵营和房间规则，另一名玩家从大厅直接加入。</p>
+      <h1>大厅</h1>
       <div class="section-title">当前房间</div>
       <div id="roomList" class="room-list"><div class="hint">正在加载大厅……</div></div>
       <div style="margin-top:14px" class="rowbtn">
@@ -121,22 +122,21 @@ button{cursor:pointer}
 
     <div id="createView" class="hidden">
       <h1>创建房间</h1>
-      <p>房主可以选择自己的阵营，并自定义本房间的兵种上限、增援量及行动后部署规则。</p>
 
       <div class="section-title">对战类型</div>
       <div class="role-choice">
-        <div id="campaignMode" class="role-card disabled" aria-disabled="true"><strong>战役模式</strong><span>暂未实现</span></div>
-        <div id="battleMode" class="role-card active" onclick="selectPlayCategory('battle')"><strong>对战模式</strong><span>与其他玩家或机器人对战</span></div>
+        <div id="campaignMode" class="role-card disabled" aria-disabled="true"><strong>战役模式</strong></div>
+        <div id="battleMode" class="role-card active" onclick="selectPlayCategory('battle')"><strong>对战模式</strong></div>
       </div>
       <div id="battleModeOptions" class="field" style="margin-top:9px">
-        <label for="variantId">模式</label>
+        <label for="variantId">地图</label>
         <select id="variantId" onchange="onVariantChanged()"><option value="" selected>等待服务器提供模式…</option></select>
       </div>
 
       <div class="section-title">我的阵营</div>
       <div class="role-choice">
-        <div id="roleA" class="role-card active" onclick="selectHostRole('attacker')"><strong>进攻方</strong><span>默认先手 · 有增援 · 最多推进至第一行</span></div>
-        <div id="roleD" class="role-card" onclick="selectHostRole('defender')"><strong>防守方</strong><span>阻止进攻方到达第一行 · 无限免费部署</span></div>
+        <div id="roleA" class="role-card active" onclick="selectHostRole('attacker')"><strong>进攻方</strong></div>
+        <div id="roleD" class="role-card" onclick="selectHostRole('defender')"><strong>防守方</strong></div>
       </div>
 
       <details id="gameParameters" class="game-parameters">
@@ -158,9 +158,9 @@ button{cursor:pointer}
             <div id="botOptions" class="field hidden" style="margin-bottom:12px">
               <label for="botDifficulty">机器人难度</label>
               <select id="botDifficulty">
-                <option value="easy">简单（更多随机选择）</option>
-                <option value="normal" selected>普通（推荐）</option>
-                <option value="hard">困难（重视威胁与站位）</option>
+                <option value="easy">简单</option>
+                <option value="normal" selected>普通</option>
+                <option value="hard">困难</option>
               </select>
             </div>
             <div class="parameter-group-title">部署规则</div>
@@ -185,17 +185,14 @@ button{cursor:pointer}
 
 <div id="gameApp" class="app hidden">
   <header class="topbar">
-    <div><div class="title">HOMG0 自走棋战棋 · 局域网版</div><div class="subtitle">服务器权威判定 · 实时同步 · 行动状态可视化</div></div>
     <div class="top-actions"><div class="pills"><span id="rolePill" class="pill">未进入房间</span><span id="turnPill" class="pill">等待</span></div><button class="settings-btn" onclick="openSettings()" aria-label="设置">⚙</button></div>
   </header>
 
   <div class="main">
-    <div class="board-area"><div id="turnStartOverlay" class="turn-start-overlay"><div class="turn-start-card"><div class="turn-start-label">回合开始</div><div id="turnStartName" class="turn-start-name">进攻方</div></div></div><div id="board" class="board"><svg id="mapConnections" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:visible"></svg><div id="chatOverlay" class="hidden"><div id="chatTop" class="chat-top"></div><div id="chatBottom" class="chat-bottom"></div></div><div id="fxLayer" class="fx-layer"></div><div id="boardGrid" class="grid" style="z-index:1"></div></div><div id="resultBanner" class="result-banner hidden"><div id="resultBannerTitle" class="result-banner-title"></div><div id="resultBannerDetail" class="result-banner-detail"></div></div></div>
+    <div class="board-area"><div id="turnStartOverlay" class="turn-start-overlay"><div class="turn-start-card"><div class="turn-start-label">回合开始</div><div id="turnStartName" class="turn-start-name">进攻方</div></div></div><div id="boardStage" class="board-stage"><div id="board" class="board"><svg id="mapConnections" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:visible"></svg><div id="chatOverlay" class="hidden"><div id="chatTop" class="chat-top"></div><div id="chatBottom" class="chat-bottom"></div></div><div id="fxLayer" class="fx-layer"></div><div id="boardGrid" class="grid" style="z-index:1"></div></div></div><div id="resultBanner" class="result-banner hidden"><div id="resultBannerTitle" class="result-banner-title"></div><div id="resultBannerDetail" class="result-banner-detail"></div></div></div>
 
     <aside class="side">
-      <div class="panel"><div class="pt">联机状态</div><div id="roomText" class="hint">尚未加入房间。</div><div id="configText" class="config-summary"></div></div>
-
-      <div class="panel"><div class="pt">游戏状态</div><div class="grid2"><div class="stat"><div class="sl">回合</div><div id="round" class="sv">-</div></div><div class="stat"><div class="sl">进攻增援</div><div id="reinforce" class="sv">-</div></div></div></div>
+      <div class="panel status-panel"><div class="pt">状态</div><div class="status-grid"><div class="stat status-wide"><div class="sl">房间</div><div id="roomText" class="sv status-text">尚未加入房间。</div></div><div class="stat"><div class="sl">回合</div><div id="round" class="sv">-</div></div><div class="stat"><div class="sl">进攻增援</div><div id="reinforce" class="sv">-</div></div><div class="stat status-wide"><div class="sl">规则</div><div id="configText" class="config-summary"></div></div></div></div>
 
       <div class="panel"><div class="pt">部署</div><div id="deployHint" class="hint">进入房间后可操作。</div><div id="unitButtons" class="unit-buttons"></div></div>
 
@@ -250,7 +247,7 @@ const AUDIO = {
   bgmUnlocked: false,
   lastEventAt: 0,
   lastBgmSrc: null,
-  lastEndEventAt: null,
+  lastEndGameKey: null,
   manifestLoaded: false,
   retryTimer: null,
   localBgmUrl: null,
@@ -283,7 +280,7 @@ async function loadAudioManifest(){
     AUDIO.manifest = Array.isArray(data.files) ? data : { files: [] };
     AUDIO.manifestLoaded = true;
     console.info(`[AUDIO] Loaded ${AUDIO.manifest.files.length} audio file(s).`);
-    if(state?.state === 'ended') startEndMusic(); else startBackgroundMusic();
+    syncGameMusic();
   } catch (err) {
     AUDIO.manifestLoaded = false;
     console.warn('[AUDIO] Failed to load /__audio_manifest:', err);
@@ -311,8 +308,14 @@ function playAudioFile(src,{loop=false,volume=1}={}){
 }
 
 function startBackgroundMusic(){
-  if(state?.state === 'ended') return;
+  if(state?.state === 'ended'){startEndMusic();return;}
+  if(AUDIO.end){AUDIO.end.pause();AUDIO.end=null;}
+  AUDIO.lastEndGameKey=null;
   if(!AUDIO.bgmUnlocked || !AUDIO.manifestLoaded) return;
+  if(AUDIO.bgm){
+    if(AUDIO.bgm.paused) resumeMusic(AUDIO.bgm);
+    return;
+  }
   if(AUDIO.localBgmUrl){
     if(AUDIO.bgm && !AUDIO.bgm.paused && AUDIO.bgm.src === new URL(AUDIO.localBgmUrl, location.href).href) return;
     if(AUDIO.bgm){ AUDIO.bgm.pause(); AUDIO.bgm = null; }
@@ -328,31 +331,42 @@ function startBackgroundMusic(){
   const src = randomItem(candidates);
   AUDIO.lastBgmSrc = src;
 
-  AUDIO.bgm = playAudioFile(src,{volume:AUDIO.bgmVolume});
-  if(AUDIO.bgm){
-    AUDIO.bgm.addEventListener('ended',()=>{
-      AUDIO.bgm = null;
-      startBackgroundMusic();
-    },{once:true});
-  }
+  AUDIO.bgm = playAudioFile(src,{loop:true,volume:AUDIO.bgmVolume});
 }
 
 function startEndMusic(){
-  if(!AUDIO.bgmUnlocked || !AUDIO.manifestLoaded || !state || state.state!=='ended') return;
-  const eventAt=state.lastEvent?.at||0;
-  if(AUDIO.lastEndEventAt===eventAt) return;
+  if(!state || state.state!=='ended') return;
+  if(AUDIO.bgm){AUDIO.bgm.pause();AUDIO.bgm=null;}
+  if(!AUDIO.bgmUnlocked || !AUDIO.manifestLoaded) return;
+  const gameKey=String(roomId||state.roomName||'current-game');
+  if(AUDIO.end){
+    if(AUDIO.end.paused) resumeMusic(AUDIO.end);
+    return;
+  }
+  if(AUDIO.lastEndGameKey===gameKey) return;
   const list=pathAudioList('/audio/end');
   if(!list.length) return;
-  if(AUDIO.bgm){AUDIO.bgm.pause();AUDIO.bgm=null;}
-  if(AUDIO.end){AUDIO.end.pause();AUDIO.end=null;}
   AUDIO.end=playAudioFile(randomItem(list),{volume:AUDIO.bgmVolume});
-  AUDIO.lastEndEventAt=eventAt||Date.now();
-  if(AUDIO.end) AUDIO.end.addEventListener('ended',()=>{AUDIO.end=null;},{once:true});
+  const track=AUDIO.end;
+  if(track) track.addEventListener('ended',()=>{
+    if(AUDIO.end!==track)return;
+    AUDIO.lastEndGameKey=gameKey;
+    AUDIO.end=null;
+  },{once:true});
+}
+
+function resumeMusic(track){
+  const result=track.play();
+  if(result&&result.catch)result.catch(err=>console.debug('[AUDIO] resume rejected:',err?.name||err));
+}
+
+function syncGameMusic(){
+  if(state?.state==='ended')startEndMusic();else startBackgroundMusic();
 }
 
 function unlockAudio(){
   AUDIO.bgmUnlocked = true;
-  if(state?.state === 'ended') startEndMusic(); else startBackgroundMusic();
+  syncGameMusic();
 }
 
 function playUnitSound(kind,type){
@@ -424,7 +438,7 @@ function connect(){
       roomId=null; roomName=null; role=null; state=null; selectedId=null; deployType=null;
       previousTurnPlayer=null; previousStarted=false; lastAnimatedEvent=0;
       if(AUDIO.bgm){AUDIO.bgm.pause();AUDIO.bgm=null;} if(AUDIO.end){AUDIO.end.pause();AUDIO.end=null;}
-      AUDIO.lastEndEventAt=null;
+      AUDIO.lastEndGameKey=null;
       document.getElementById('resultBanner')?.classList.add('hidden');
       document.getElementById('gameModal').classList.add('hidden');
       document.getElementById('gameApp').classList.add('hidden');
@@ -437,7 +451,7 @@ function connect(){
       roomId = m.id || null; roomName = m.name || null; role = m.role;
       document.getElementById('login').classList.add('hidden');
       document.getElementById('gameApp').classList.remove('hidden');
-      updateMobileLayout();
+      updateBoardScale();
     }
     if(m.type === 'state'){
       state = m.state;
@@ -529,7 +543,7 @@ function renderLobby(){
     const roleText=room.hostRole==='attacker'?'进攻方':'防守方';
     const modeText=room.gameMode==='ai'?'人机对战':'玩家对战';
     const turnText=room.turnMode==='simultaneous'?'同时回合制':'轮流回合制';
-    const variantText=escapeHtml(room.variant?.name||'经典模式');
+    const variantText=escapeHtml(room.variant?.name||'经典');
     const difficultyText=room.gameMode==='ai'?` · ${botDifficultyName(room.botDifficulty)}`:'';
     const playing=room.status==='playing';
     const action=playing?'观战':(room.playerCount>=2?'观战':'加入');
@@ -672,8 +686,27 @@ function canPlanNow(){
   return state.currentPlayer===role;
 }
 
+function deploymentCount(type){
+  if(!state || !role) return 0;
+  const deployed=(state.units||[]).filter(unit=>unit.player===role && unit.type===type).length;
+  const planned=state.turnMode==='simultaneous'
+    ? (state.planning?.you?.deployments||[]).filter(item=>item.type===type).length
+    : 0;
+  return deployed+planned;
+}
+
+function deploymentUnavailable(type){
+  if(!canPlanNow()) return true;
+  const rule=unitDefinitions?.[type];
+  if(!rule || Array.isArray(rule.allowedPlayers) && !rule.allowedPlayers.includes(role)) return true;
+  const maxima=state.config?.[role==='attacker'?'attackerMax':'defenderMax']||{};
+  if(deploymentCount(type)>=(Number(maxima[type])||0)) return true;
+  if(role==='attacker' && Number(state.attackerReinforcement||0) <= (state.turnMode==='simultaneous' ? (state.planning?.you?.deployments||[]).length : 0)) return true;
+  return false;
+}
+
 function chooseDeploy(t){
-  if(!canPlanNow()) return;
+  if(deploymentUnavailable(t)) return;
   deployType = deployType===t ? null : t;
   selectedId = null;
   render();
@@ -920,6 +953,8 @@ function boundedNumber(value,min,max,fallback){
   return Number.isFinite(number)?Math.max(min,Math.min(max,number)):fallback;
 }
 
+function isBoardRow(value){return Number.isFinite(value)&&Number.isInteger(value*2);}
+
 function normalizeBoard(raw){
   const source=raw&&typeof raw==='object'?raw:null;
   if(!source) return null;
@@ -928,7 +963,7 @@ function normalizeBoard(raw){
   const rows=[];
   for(const rawRow of sourceRows.slice(0,30)){
     const id=Number(rawRow?.id);
-    if(!Number.isInteger(id)||seenRows.has(id)||!Array.isArray(rawRow.cells)) continue;
+    if(!isBoardRow(id)||seenRows.has(id)||!Array.isArray(rawRow.cells)) continue;
     const seenCols=new Set();
     const cells=[];
     for(const rawCell of rawRow.cells.slice(0,50)){
@@ -936,7 +971,10 @@ function normalizeBoard(raw){
       if(!Number.isInteger(col)||seenCols.has(col)) continue;
       const terrain=String(rawCell?.terrain||'').slice(0,48);
       if(!terrain) continue;
-      cells.push({col,displayCol:String(rawCell.displayCol??col+1).slice(0,12),terrain});
+      const left=rawCell.left!=null&&Number.isFinite(Number(rawCell.left))?Number(rawCell.left):null;
+      const top=rawCell.top!=null&&Number.isFinite(Number(rawCell.top))?boundedNumber(rawCell.top,0,4000,0):null;
+      const x=rawCell.x!=null&&Number.isFinite(Number(rawCell.x))?Number(rawCell.x):null;
+      cells.push({col,displayCol:String(rawCell.displayCol??col+1).slice(0,12),terrain,left,top,x});
       seenCols.add(col);
     }
     if(!cells.length) continue;
@@ -947,10 +985,12 @@ function normalizeBoard(raw){
   const inset=source.gridInset||{};
   const cellSize=source.cellSize||{};
   const deploymentRows=source.deploymentRows||{};
+  const deploymentAreas=source.deploymentAreas&&typeof source.deploymentAreas==='object'?source.deploymentAreas:{};
+  const regions=source.regions&&typeof source.regions==='object'?source.regions:{};
   const connections=Array.isArray(source.connections)?source.connections.slice(0,5000).flatMap(connection=>{
     const from=connection?.from, to=connection?.to;
     const fromRow=Number(from?.row), fromCol=Number(from?.col), toRow=Number(to?.row), toCol=Number(to?.col);
-    if(![fromRow,fromCol,toRow,toCol].every(Number.isInteger)) return [];
+    if(!isBoardRow(fromRow)||!Number.isInteger(fromCol)||!isBoardRow(toRow)||!Number.isInteger(toCol)) return [];
     return [{from:{row:fromRow,col:fromCol},to:{row:toRow,col:toCol},type:String(connection.type||'adjacent').slice(0,32),style:connection.style&&typeof connection.style==='object'?connection.style:null}];
   }):[];
   return {
@@ -960,9 +1000,11 @@ function normalizeBoard(raw){
     cellSize:{width:boundedNumber(cellSize.width,44,300,116),height:boundedNumber(cellSize.height,44,240,90)},
     gap:boundedNumber(source.gap,0,80,12),
     deploymentRows:{
-      attacker:Number.isInteger(Number(deploymentRows.attacker))?Number(deploymentRows.attacker):null,
-      defender:Number.isInteger(Number(deploymentRows.defender))?Number(deploymentRows.defender):null
+      attacker:isBoardRow(Number(deploymentRows.attacker))?Number(deploymentRows.attacker):null,
+      defender:isBoardRow(Number(deploymentRows.defender))?Number(deploymentRows.defender):null
     },
+    deploymentAreas,
+    regions,
     connections,
     rows
   };
@@ -1017,18 +1059,49 @@ function ensureBoardLayout(){
   board.style.setProperty('--cell-width',`${next.cellSize.width}px`);
   board.style.setProperty('--cell-height',`${next.cellSize.height}px`);
   board.style.setProperty('--cell-gap',`${next.gap}px`);
+  const unitScale=Math.max(.25,Math.min(3,next.cellSize.width/116,next.cellSize.height/90));
+  board.style.setProperty('--unit-model-size',`${56*unitScale}px`);
+  board.style.setProperty('--unit-model-border',`${3*unitScale}px`);
+  board.style.setProperty('--unit-model-font',`${17*unitScale}px`);
+  board.style.setProperty('--unit-model-icon',`${31*unitScale}px`);
+  board.style.setProperty('--unit-model-fallback-font',`${22*unitScale}px`);
+  board.style.setProperty('--unit-model-outline',`${4*unitScale}px`);
+  board.style.setProperty('--unit-model-shadow-y',`${7*unitScale}px`);
+  board.style.setProperty('--unit-model-shadow-blur',`${18*unitScale}px`);
+  board.style.setProperty('--unit-model-icon-shadow',`${unitScale}px`);
+  board.style.setProperty('--unit-model-icon-shadow-blur',`${2*unitScale}px`);
+  board.style.setProperty('--unit-model-mini-bottom',`${-10*unitScale}px`);
+  board.style.setProperty('--unit-model-badge-size',`${19*unitScale}px`);
+  board.style.setProperty('--unit-model-badge-radius',`${6*unitScale}px`);
+  board.style.setProperty('--unit-model-badge-padding',`${4*unitScale}px`);
+  board.style.setProperty('--unit-model-badge-font',`${9*unitScale}px`);
+  board.style.setProperty('--unit-model-badge-gap',`${3*unitScale}px`);
+  board.style.setProperty('--unit-model-badge-border',`${Math.max(.5,unitScale)}px`);
   const fragment=document.createDocumentFragment();
+  const gridWidth=Math.max(0,next.width-next.gridInset.left-next.gridInset.right);
   for(const row of next.rows){
     const rowEl=document.createElement('div');
     rowEl.className='row';
     rowEl.dataset.row=String(row.id);
     rowEl.style.top=`${row.top}px`;
-    for(const cell of row.cells) rowEl.appendChild(createCell(row,cell));
+    const totalWidth=row.cells.length*next.cellSize.width+Math.max(0,row.cells.length-1)*next.gap;
+    const defaultLeft=Math.max(0,(gridWidth-totalWidth)/2);
+    row.cells.forEach((cell,index)=>{
+      const cellEl=createCell(row,cell);
+      const left=Number.isFinite(cell.left)
+        ? cell.left
+        : defaultLeft+index*(next.cellSize.width+next.gap);
+      const top=Number.isFinite(cell.top) ? cell.top-row.top : 0;
+      cellEl.style.position='absolute';
+      cellEl.style.left=`${left}px`;
+      cellEl.style.top=`${top}px`;
+      rowEl.appendChild(cellEl);
+    });
     fragment.appendChild(rowEl);
   }
   grid.replaceChildren(fragment);
   renderMapConnections();
-  updateMobileLayout();
+  updateBoardScale();
   return true;
 }
 
@@ -1182,10 +1255,11 @@ function render(){
   document.getElementById('reinforce').textContent=state.attackerReinforcement;
   document.getElementById('roomText').innerHTML=state?.roomName?`<strong>${escapeHtml(state.roomName)}</strong> · ${escapeHtml(state.variant?.name||state.variantId||'未知模式')} · ${state.gameMode==='ai'?`人机对战（${botDifficultyName(state.botDifficulty)}）`:'玩家对战'} · ${state.roomPlayerCount}/2 · ${role==='spectator'?'观战中':`你是${playerName(role)}`}${state.botRole?` · 机器人是${playerName(state.botRole)}`:''}${!state.started?' · 等待另一名玩家加入':''}`:'尚未加入房间。';
   document.getElementById('configText').textContent=state.config?configSummary():'';
-  const deployRow=boardLayout.deploymentRows?.[role]??(role==='attacker'?6:1);
+  const deployRow=boardLayout.deploymentRows?.[role];
+  const deployLocation=Number.isInteger(deployRow)?`第${deployRow}行`:'指定部署区域';
   const mySubmitted=!!state.planning?.you?.submitted;
   const submitStatus=planning?`进攻方${state.planning?.attackerSubmitted?'已提交':'规划中'} · 防守方${state.planning?.defenderSubmitted?'已提交':'规划中'}`:'';
-  document.getElementById('deployHint').textContent=planning?(mySubmitted?`你已提交本回合规划，等待对方。${submitStatus}`:`可部署在第${deployRow}行；${role==='attacker'?`剩余增援 ${state.attackerReinforcement}`:'不消耗增援'}；${submitStatus}`):(state.currentPlayer!==role?'等待对方回合。':`可部署在第${deployRow}行；${role==='attacker'?`剩余增援 ${state.attackerReinforcement}`:'不消耗增援'}；行动后部署${state.config.allowDeployAfterAction?'已开启':'未开启'}。`);
+  document.getElementById('deployHint').textContent=planning?(mySubmitted?`你已提交本回合规划，等待对方。${submitStatus}`:`可部署在${deployLocation}；${role==='attacker'?`剩余增援 ${state.attackerReinforcement}`:'不消耗增援'}；${submitStatus}`):(state.currentPlayer!==role?'等待对方回合。':`可部署在${deployLocation}；${role==='attacker'?`剩余增援 ${state.attackerReinforcement}`:'不消耗增援'}；行动后部署${state.config.allowDeployAfterAction?'已开启':'未开启'}。`);
   const canOperate=canPlanNow();
   const endTurnBtn=document.getElementById('endTurnBtn');
   endTurnBtn.textContent=planning?'提交规划':'结束回合';
@@ -1196,8 +1270,10 @@ function render(){
   document.getElementById('chatInput').disabled=state.state!=='playing';
   document.getElementById('chatSend').disabled=state.state!=='playing';
 
-  document.querySelectorAll('.unit-buttons button').forEach(b=>b.disabled=!canOperate);
-  if(role==='attacker' && state.attackerReinforcement<=0) document.querySelectorAll('.unit-buttons button').forEach(b=>b.disabled=true);
+  if(deployType && deploymentUnavailable(deployType)) deployType=null;
+  document.querySelectorAll('.unit-buttons button').forEach(button=>{
+    button.disabled=deploymentUnavailable(button.dataset.type);
+  });
   document.querySelectorAll('.unit-buttons button').forEach(b=>b.classList.remove('active'));
   if(deployType) document.querySelectorAll('#unitButtons button').forEach(button=>{if(button.dataset.type===deployType) button.classList.add('active');});
 
@@ -1209,7 +1285,7 @@ function render(){
   renderBoard();
   if(state.lastEvent && state.lastEvent.at>lastAnimatedEvent) startTransientEvent(state.lastEvent);
   if(state.lastEvent) playEventSound(state.lastEvent);
-  if(state.state==='ended') startEndMusic(); else startBackgroundMusic();
+  syncGameMusic();
 
   if(state.state==='ended'){
     const banner=document.getElementById('resultBanner');
@@ -1242,37 +1318,42 @@ document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='
 window.addEventListener('pointerdown',unlockAudio,{passive:true});
 window.addEventListener('touchstart',unlockAudio,{passive:true});
 window.addEventListener('keydown',unlockAudio);
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') startBackgroundMusic(); });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') syncGameMusic(); });
 loadAudioManifest();
 
-/* 手机端棋盘自适应：只改变显示缩放，不改变坐标和游戏逻辑。 */
-function updateMobileLayout(){
+function updateBoardScale(){
   const boardArea=document.querySelector('.board-area');
+  const boardStage=document.getElementById('boardStage');
   const board=document.getElementById('board');
-  if(!boardArea||!board) return;
+  if(!boardArea||!boardStage||!board) return;
   if(!boardLayout){
-    document.documentElement.style.removeProperty('--mobile-board-scale');
-    boardArea.style.height='0px';
+    board.style.setProperty('--board-scale','1');
+    boardStage.style.setProperty('--scaled-board-width','0px');
+    boardStage.style.setProperty('--scaled-board-height','0px');
     return;
   }
-  const isMobile=window.matchMedia('(max-width:700px)').matches;
-  if(!isMobile){
-    document.documentElement.style.removeProperty('--mobile-board-scale');
-    boardArea.style.removeProperty('height');
-    board.style.removeProperty('margin-bottom');
-    return;
-  }
+  const style=getComputedStyle(boardArea);
+  const horizontalPadding=(parseFloat(style.paddingLeft)||0)+(parseFloat(style.paddingRight)||0);
+  const verticalPadding=(parseFloat(style.paddingTop)||0)+(parseFloat(style.paddingBottom)||0);
+  const areaRect=boardArea.getBoundingClientRect();
   const boardWidth=boardLayout.width;
   const boardHeight=boardLayout.height;
-  const available=Math.max(280, window.innerWidth-8);
-  const scale=Math.min(1, available/boardWidth);
-  document.documentElement.style.setProperty('--mobile-board-scale', String(scale));
-  board.style.marginBottom=`-${Math.ceil(boardHeight*(1-scale))}px`;
-  boardArea.style.height=`${Math.ceil(boardHeight*scale+(state?.state==='ended'?100:12))}px`;
+  const viewportWidth=document.documentElement.clientWidth;
+  const widthInsideViewport=Math.max(1,viewportWidth-Math.max(0,areaRect.left)-horizontalPadding);
+  const availableWidth=Math.max(1,Math.min(boardArea.clientWidth-horizontalPadding,widthInsideViewport));
+  const availableHeight=Math.max(1,window.innerHeight-areaRect.top-verticalPadding-12);
+  const scale=Math.min(1,availableWidth/boardWidth,availableHeight/boardHeight);
+  const scaledWidth=Math.max(1,Math.floor(boardWidth*scale));
+  const scaledHeight=Math.max(1,Math.floor(boardHeight*scale));
+  board.style.setProperty('--board-scale',String(scale));
+  boardStage.style.setProperty('--scaled-board-width',`${scaledWidth}px`);
+  boardStage.style.setProperty('--scaled-board-height',`${scaledHeight}px`);
+  boardArea.style.setProperty('--scaled-board-width',`${scaledWidth}px`);
 }
-window.addEventListener('resize',updateMobileLayout,{passive:true});
-window.addEventListener('orientationchange',()=>setTimeout(updateMobileLayout,120),{passive:true});
-updateMobileLayout();
+window.addEventListener('resize',updateBoardScale,{passive:true});
+window.addEventListener('orientationchange',()=>setTimeout(updateBoardScale,120),{passive:true});
+if('ResizeObserver' in window)new ResizeObserver(updateBoardScale).observe(document.querySelector('.board-area'));
+updateBoardScale();
 connect();
 </script>
 </body>

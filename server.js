@@ -9,9 +9,8 @@ const HOST = '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.webm', '.flac']);
 const AUDIO_ROOT = path.resolve(PUBLIC_DIR, 'audio');
-const BOT_STEP_DELAY = 550;
-const BOT_MAX_STEPS_PER_TURN = 100;
 const DATA_ROOT = path.join(__dirname, 'data');
+const CLIENT_ASSET_VERSION = '20260916-half-row-map-v2';
 
 function serializeDefinition(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
@@ -44,28 +43,53 @@ function freezeDefinition(value) {
 function parseCoordinate(value) {
   if (typeof value === 'string') {
     const [row, col] = value.split(',').map(Number);
-    if (Number.isInteger(row) && Number.isInteger(col)) return { row, col };
+    if (isBoardRow(row) && Number.isInteger(col)) return { row, col };
   }
   if (value && typeof value === 'object') {
     const row = Number(value.row), col = Number(value.col);
-    if (Number.isInteger(row) && Number.isInteger(col)) return { row, col };
+    if (isBoardRow(row) && Number.isInteger(col)) return { row, col };
   }
   return null;
 }
 
+function isBoardRow(value) {
+  return Number.isFinite(value) && Number.isInteger(value * 2);
+}
+
 function normalizeBoardDefinition(raw) {
   const board = deserializeDefinition(raw, 'board');
+  const schemaVersion = Number(board.schemaVersion) || 1;
+  if (schemaVersion !== 1) throw new Error(`unsupported board schemaVersion: ${schemaVersion}`);
   if (!Array.isArray(board.rows) || !board.rows.length) throw new Error('board.rows must be a non-empty array');
+  const coordinateLayout = board.coordinateLayout && typeof board.coordinateLayout === 'object' ? board.coordinateLayout : {};
+  const originX = Number.isFinite(Number(coordinateLayout.originX)) ? Number(coordinateLayout.originX) : 1;
+  const columnStep = Number.isFinite(Number(coordinateLayout.columnStep)) && Number(coordinateLayout.columnStep) > 0
+    ? Number(coordinateLayout.columnStep)
+    : null;
   const rows = board.rows.map(row => ({
     id: Number(row.id),
     top: Number(row.top) || 0,
     cells: Array.isArray(row.cells) ? row.cells.map(cell => ({
       col: Number(cell.col),
       displayCol: String(cell.displayCol ?? Number(cell.col) + 1),
-      terrain: String(cell.terrain || '')
+      terrain: String(cell.terrain || ''),
+      x: Number.isFinite(Number(cell.x)) ? Number(cell.x) : null,
+      top: Number.isFinite(Number(cell.top)) ? Number(cell.top) : null,
+      left: Number.isFinite(Number(cell.left))
+        ? Number(cell.left)
+        : (columnStep && Number.isFinite(Number(cell.x)) ? (Number(cell.x) - originX) * columnStep : null)
     })).filter(cell => Number.isInteger(cell.col)) : []
-  })).filter(row => Number.isInteger(row.id) && row.cells.length);
+  })).filter(row => isBoardRow(row.id) && row.cells.length);
   if (!rows.length) throw new Error('board.rows contains no valid rows');
+
+  const cellKeys = new Set();
+  for (const row of rows) {
+    for (const cell of row.cells) {
+      const cellKey = `${row.id},${cell.col}`;
+      if (cellKeys.has(cellKey)) throw new Error(`board contains duplicate cell: ${cellKey}`);
+      cellKeys.add(cellKey);
+    }
+  }
 
   const edges = [];
   const seenEdges = new Set();
@@ -86,18 +110,104 @@ function normalizeBoardDefinition(raw) {
       for (const target of targets) addEdge(from, target);
     }
   }
+  if (!edges.length && cellKeys.size > 1) throw new Error('board contains multiple cells but no connections');
+  for (const edge of edges) {
+    if (!cellKeys.has(`${edge.from.row},${edge.from.col}`) || !cellKeys.has(`${edge.to.row},${edge.to.col}`)) {
+      throw new Error('board connection references an unknown cell');
+    }
+  }
+  if (cellKeys.size > 1) {
+    const connected = new Set([cellKeys.values().next().value]);
+    const queue = [...connected];
+    for (let index = 0; index < queue.length; index++) {
+      const current = queue[index];
+      for (const edge of edges) {
+        const from = `${edge.from.row},${edge.from.col}`, to = `${edge.to.row},${edge.to.col}`;
+        const next = from === current ? to : (to === current ? from : null);
+        if (next && !connected.has(next)) { connected.add(next); queue.push(next); }
+      }
+    }
+    if (connected.size !== cellKeys.size) throw new Error(`board is disconnected: reached ${connected.size} of ${cellKeys.size} cells`);
+  }
   return freezeDefinition({
-    schemaVersion: Number(board.schemaVersion) || 1,
+    schemaVersion,
+    contentVersion: Number(board.contentVersion) || 1,
     id: String(board.id || 'classic'),
+    terrainTypeSet: String(board.terrainTypeSet || ''),
     name: String(board.name || board.id || '棋盘'),
     width: Number(board.width) || 790,
     height: Number(board.height) || 720,
     gridInset: board.gridInset || {},
     cellSize: board.cellSize || {},
     gap: Number(board.gap) || 0,
+    coordinateLayout: { originX, columnStep },
     deploymentRows: board.deploymentRows || {},
+    deploymentAreas: board.deploymentAreas || {},
+    regions: board.regions || {},
     rows,
     connections: edges
+  });
+}
+
+function validDefinitionId(value) {
+  return typeof value === 'string'
+    && /^[a-zA-Z0-9_-]{1,64}$/.test(value)
+    && value !== '__proto__'
+    && value !== 'prototype'
+    && value !== 'constructor';
+}
+
+function schemaVersionOf(source, label) {
+  const schemaVersion = Number(source.schemaVersion) || 1;
+  if (schemaVersion !== 1) throw new Error(`unsupported ${label} schemaVersion: ${schemaVersion}`);
+  return schemaVersion;
+}
+
+function normalizeTerrainTypesDefinition(raw) {
+  const source = deserializeDefinition(raw, 'terrain types');
+  if (!validDefinitionId(source.id)) throw new Error('terrain types has an invalid id');
+  const input = source.terrainTypes && typeof source.terrainTypes === 'object' ? source.terrainTypes : {};
+  const terrainTypes = {};
+  for (const [id, value] of Object.entries(input)) {
+    if (!validDefinitionId(id) || !value || typeof value !== 'object') continue;
+    terrainTypes[id] = {
+      name: String(value.name || id),
+      color: String(value.color || ''),
+      borderColor: String(value.borderColor || ''),
+      symbol: String(value.symbol || ''),
+      icon: String(value.icon || ''),
+      description: String(value.description || '')
+    };
+  }
+  if (!Object.keys(terrainTypes).length) throw new Error('terrain types contains no valid definitions');
+  return freezeDefinition({
+    schemaVersion: schemaVersionOf(source, 'terrain types'),
+    contentVersion: Number(source.contentVersion) || 1,
+    id: source.id,
+    terrainTypes
+  });
+}
+
+function normalizeUnitTypesDefinition(raw) {
+  const source = deserializeDefinition(raw, 'unit types');
+  if (!validDefinitionId(source.id)) throw new Error('unit types has an invalid id');
+  const input = source.unitTypes && typeof source.unitTypes === 'object' ? source.unitTypes : {};
+  const unitTypes = {};
+  for (const [id, value] of Object.entries(input)) {
+    if (!validDefinitionId(id) || !value || typeof value !== 'object') continue;
+    unitTypes[id] = {
+      name: String(value.name || id),
+      short: String(value.short || '?'),
+      icon: String(value.icon || ''),
+      description: String(value.description || '')
+    };
+  }
+  if (!Object.keys(unitTypes).length) throw new Error('unit types contains no valid definitions');
+  return freezeDefinition({
+    schemaVersion: schemaVersionOf(source, 'unit types'),
+    contentVersion: Number(source.contentVersion) || 1,
+    id: source.id,
+    unitTypes
   });
 }
 
@@ -189,38 +299,412 @@ function safeDataPath(relativePath) {
   return full;
 }
 
-function normalizeVariantCatalog(raw) {
-  const source = deserializeDefinition(raw, 'variants');
-  const entries = source.variants && typeof source.variants === 'object' ? source.variants : source;
-  const out = {};
-  for (const [id, value] of Object.entries(entries)) {
-    if (!/^[a-zA-Z0-9_-]{1,48}$/.test(id) || !value || typeof value !== 'object') continue;
-    if (!value.board || !value.units || !value.rules) continue;
-    out[id] = {
-      id, name: String(value.name || id), category: String(value.category || 'battle'),
-      enabled: value.enabled !== false, engine: String(value.engine || id),
-      supportsAi: value.supportsAi === true,
-      boardPath: String(value.board), unitsPath: String(value.units), rulesPath: String(value.rules)
-    };
+function copyDefinition(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeResourceReference(value, label, optional = false) {
+  if (value == null && optional) return null;
+  const source = typeof value === 'string' ? { path: value } : value;
+  if (!source || typeof source !== 'object' || typeof source.path !== 'string' || !source.path.trim()) {
+    throw new Error(`${label} resource reference is required`);
   }
-  if (!Object.keys(out).length) throw new Error('variants contains no valid entries');
+  safeDataPath(source.path);
+  if (source.id != null && !validDefinitionId(String(source.id))) throw new Error(`${label} has an invalid expected id`);
+  if (source.contentVersion != null && (!Number.isInteger(Number(source.contentVersion)) || Number(source.contentVersion) < 1)) {
+    throw new Error(`${label} has an invalid contentVersion`);
+  }
+  return freezeDefinition({
+    path: source.path.replace(/\\/g, '/'),
+    id: source.id == null ? null : String(source.id),
+    contentVersion: source.contentVersion == null ? null : Number(source.contentVersion)
+  });
+}
+
+function loadReferencedDefinition(reference, label) {
+  const source = loadSerializedDefinition(reference.path);
+  if (reference.id && source.id !== reference.id) {
+    throw new Error(`${label} id mismatch: expected ${reference.id}, received ${source.id || '(missing)'}`);
+  }
+  const actualVersion = Number(source.contentVersion) || 1;
+  if (reference.contentVersion != null && actualVersion !== reference.contentVersion) {
+    throw new Error(`${label} contentVersion mismatch: expected ${reference.contentVersion}, received ${actualVersion}`);
+  }
+  return source;
+}
+
+function normalizeBattleCatalog(raw) {
+  const source = deserializeDefinition(raw, 'battle catalog');
+  schemaVersionOf(source, 'battle catalog');
+  const entries = Array.isArray(source.battles)
+    ? source.battles
+    : Object.entries(source.battles || {}).map(([id, value]) => ({ id, ...value }));
+  const out = {};
+  for (const value of entries) {
+    if (!value || typeof value !== 'object' || !validDefinitionId(value.id)) continue;
+    if (Object.hasOwn(out, value.id)) throw new Error(`duplicate battle id: ${value.id}`);
+    out[value.id] = freezeDefinition({
+      id: value.id,
+      enabled: value.enabled !== false,
+      manifest: normalizeResourceReference(value.manifest, `battle ${value.id} manifest`)
+    });
+  }
+  if (!Object.keys(out).length) throw new Error('battle catalog contains no valid entries');
   return freezeDefinition(out);
 }
 
-const VARIANT_CATALOG = normalizeVariantCatalog(loadSerializedDefinition('variants.json'));
+function normalizeBattleManifest(raw, catalogId) {
+  const source = deserializeDefinition(raw, `battle ${catalogId}`);
+  if (!validDefinitionId(source.id) || source.id !== catalogId) throw new Error(`battle manifest id must be ${catalogId}`);
+  const resources = source.resources && typeof source.resources === 'object' ? source.resources : {};
+  return freezeDefinition({
+    schemaVersion: schemaVersionOf(source, 'battle manifest'),
+    contentVersion: Number(source.contentVersion) || 1,
+    id: source.id,
+    name: String(source.name || source.id),
+    category: String(source.category || 'battle'),
+    enabled: source.enabled !== false,
+    engine: String(source.engine || source.id),
+    supportsAi: source.supportsAi === true,
+    resources: {
+      terrainTypes: normalizeResourceReference(resources.terrainTypes, `${source.id}.terrainTypes`),
+      unitTypes: normalizeResourceReference(resources.unitTypes, `${source.id}.unitTypes`),
+      map: normalizeResourceReference(resources.map, `${source.id}.map`),
+      combatRules: normalizeResourceReference(resources.combatRules, `${source.id}.combatRules`),
+      gameRules: normalizeResourceReference(resources.gameRules, `${source.id}.gameRules`),
+      aiProfile: normalizeResourceReference(resources.aiProfile, `${source.id}.aiProfile`, source.supportsAi !== true),
+      scenarioRules: normalizeResourceReference(resources.scenarioRules, `${source.id}.scenarioRules`, true)
+    }
+  });
+}
+
+function normalizeAiProfileDefinition(raw, terrainTypes, unitTypes) {
+  const source = deserializeDefinition(raw, 'AI profile');
+  if (!validDefinitionId(source.id)) throw new Error('AI profile has an invalid id');
+  if (source.algorithm !== 'bounded-lookahead') throw new Error(`unsupported AI algorithm: ${source.algorithm || '(missing)'}`);
+  if (source.requires?.terrainTypes !== terrainTypes.id) throw new Error(`AI profile requires terrain types ${source.requires?.terrainTypes || '(missing)'}`);
+  if (source.requires?.unitTypes !== unitTypes.id) throw new Error(`AI profile requires unit types ${source.requires?.unitTypes || '(missing)'}`);
+  const integer = (value, min, max, label) => {
+    const number = Number(value);
+    if (!Number.isInteger(number) || number < min || number > max) throw new Error(`AI profile has an invalid ${label}`);
+    return number;
+  };
+  const decimal = (value, min, max, label) => {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < min || number > max) throw new Error(`AI profile has an invalid ${label}`);
+    return number;
+  };
+  const execution = source.execution && typeof source.execution === 'object' ? source.execution : {};
+  const evaluation = source.evaluation && typeof source.evaluation === 'object' ? source.evaluation : {};
+  const unitProfiles = evaluation.unitProfiles && typeof evaluation.unitProfiles === 'object' ? evaluation.unitProfiles : {};
+  const terrainScores = evaluation.terrainScores && typeof evaluation.terrainScores === 'object' ? evaluation.terrainScores : {};
+  for (const id of Object.keys(unitProfiles)) {
+    if (!Object.hasOwn(unitTypes.unitTypes, id)) throw new Error(`AI profile references unknown unit type: ${id}`);
+  }
+  for (const id of Object.keys(unitTypes.unitTypes)) {
+    if (!Object.hasOwn(unitProfiles, id)) throw new Error(`AI profile is missing unit profile: ${id}`);
+  }
+  for (const id of Object.keys(terrainScores)) {
+    if (!Object.hasOwn(terrainTypes.terrainTypes, id)) throw new Error(`AI profile references unknown terrain type: ${id}`);
+  }
+  const difficulties = {};
+  for (const [id, value] of Object.entries(source.difficulties || {})) {
+    if (!validDefinitionId(id) || !value || typeof value !== 'object') throw new Error(`AI profile has an invalid difficulty: ${id}`);
+    difficulties[id] = {
+      searchDepth: integer(value.searchDepth, 1, 2, `${id}.searchDepth`),
+      maxRootCandidates: integer(value.maxRootCandidates, 1, 32, `${id}.maxRootCandidates`),
+      maxBranching: integer(value.maxBranching, 1, 12, `${id}.maxBranching`),
+      maxNodes: integer(value.maxNodes, 1, 128, `${id}.maxNodes`),
+      timeBudgetMs: integer(value.timeBudgetMs, 1, 50, `${id}.timeBudgetMs`),
+      futureDiscount: decimal(value.futureDiscount, 0, 1, `${id}.futureDiscount`),
+      topChoices: integer(value.topChoices, 1, 8, `${id}.topChoices`),
+      nearBestWindow: decimal(value.nearBestWindow, 0, 1000, `${id}.nearBestWindow`),
+      dangerWeight: decimal(value.dangerWeight, 0, 5, `${id}.dangerWeight`),
+      mobilityWeight: decimal(value.mobilityWeight, 0, 5, `${id}.mobilityWeight`)
+    };
+  }
+  if (!Object.keys(difficulties).length) throw new Error('AI profile contains no difficulties');
+  const defaultDifficulty = String(source.defaultDifficulty || '');
+  if (!Object.hasOwn(difficulties, defaultDifficulty)) throw new Error('AI profile defaultDifficulty is unknown');
+  return freezeDefinition({
+    schemaVersion: schemaVersionOf(source, 'AI profile'),
+    contentVersion: Number(source.contentVersion) || 1,
+    id: source.id,
+    algorithm: source.algorithm,
+    requires: source.requires,
+    defaultDifficulty,
+    execution: {
+      stepDelayMs: integer(execution.stepDelayMs, 0, 10000, 'execution.stepDelayMs'),
+      maxStepsPerTurn: integer(execution.maxStepsPerTurn, 1, 500, 'execution.maxStepsPerTurn'),
+      maxDeploymentsPerPlan: integer(execution.maxDeploymentsPerPlan, 1, 200, 'execution.maxDeploymentsPerPlan')
+    },
+    evaluation: copyDefinition(evaluation),
+    difficulties
+  });
+}
+
+function assertKnownReferences(values, definitions, label) {
+  if (!Array.isArray(values)) return;
+  for (const id of values) {
+    if (!Object.hasOwn(definitions, id)) throw new Error(`${label} references unknown id: ${id}`);
+  }
+}
+
+function normalizeCombatRulesDefinition(raw, terrainTypes, unitTypes) {
+  const source = deserializeDefinition(raw, 'combat rules');
+  if (!validDefinitionId(source.id)) throw new Error('combat rules has an invalid id');
+  if (source.requires?.terrainTypes !== terrainTypes.id) throw new Error(`combat rules requires terrain types ${source.requires?.terrainTypes || '(missing)'}`);
+  if (source.requires?.unitTypes !== unitTypes.id) throw new Error(`combat rules requires unit types ${source.requires?.unitTypes || '(missing)'}`);
+  const unitProfiles = source.unitProfiles && typeof source.unitProfiles === 'object' ? source.unitProfiles : {};
+  const terrainProfiles = source.terrainProfiles && typeof source.terrainProfiles === 'object' ? source.terrainProfiles : {};
+  for (const id of Object.keys(unitProfiles)) {
+    if (!Object.hasOwn(unitTypes.unitTypes, id)) throw new Error(`combat rules references unknown unit type: ${id}`);
+    assertKnownReferences(unitProfiles[id]?.immuneFrom, unitTypes.unitTypes, `unit profile ${id}.immuneFrom`);
+  }
+  for (const id of Object.keys(unitTypes.unitTypes)) {
+    if (!Object.hasOwn(unitProfiles, id)) throw new Error(`combat rules is missing unit profile: ${id}`);
+  }
+  for (const id of Object.keys(terrainProfiles)) {
+    if (!Object.hasOwn(terrainTypes.terrainTypes, id)) throw new Error(`combat rules references unknown terrain type: ${id}`);
+    assertKnownReferences(terrainProfiles[id]?.passableUnits, unitTypes.unitTypes, `terrain profile ${id}.passableUnits`);
+    assertKnownReferences(terrainProfiles[id]?.attackImmuneFrom, unitTypes.unitTypes, `terrain profile ${id}.attackImmuneFrom`);
+  }
+  for (const id of Object.keys(terrainTypes.terrainTypes)) {
+    if (!Object.hasOwn(terrainProfiles, id)) throw new Error(`combat rules is missing terrain profile: ${id}`);
+  }
+  const instantKill = source.combat?.instantKill;
+  if (instantKill) {
+    assertKnownReferences(instantKill.attackerTypes, unitTypes.unitTypes, 'combat.instantKill.attackerTypes');
+    assertKnownReferences(instantKill.targetTypes, unitTypes.unitTypes, 'combat.instantKill.targetTypes');
+    assertKnownReferences(instantKill.terrainTypes, terrainTypes.terrainTypes, 'combat.instantKill.terrainTypes');
+  }
+  return freezeDefinition(copyDefinition({
+    schemaVersion: schemaVersionOf(source, 'combat rules'),
+    contentVersion: Number(source.contentVersion) || 1,
+    id: source.id,
+    requires: source.requires,
+    unitProfiles,
+    terrainProfiles,
+    combat: source.combat || {}
+  }));
+}
+
+function normalizeGameRulesDefinition(raw, combatRules, unitTypes) {
+  const source = deserializeDefinition(raw, 'game rules');
+  if (!validDefinitionId(source.id)) throw new Error('game rules has an invalid id');
+  if (source.requires?.combatRules !== combatRules.id) throw new Error(`game rules requires combat rules ${source.requires?.combatRules || '(missing)'}`);
+  const deploymentProfiles = source.deployment?.unitProfiles && typeof source.deployment.unitProfiles === 'object'
+    ? source.deployment.unitProfiles
+    : {};
+  for (const [id, profile] of Object.entries(deploymentProfiles)) {
+    if (!Object.hasOwn(unitTypes.unitTypes, id)) throw new Error(`game rules references unknown unit type: ${id}`);
+    const players = Array.isArray(profile?.allowedPlayers) ? profile.allowedPlayers : [];
+    if (players.some(player => player !== 'attacker' && player !== 'defender')) throw new Error(`game rules has an invalid player in ${id}.allowedPlayers`);
+  }
+  for (const id of Object.keys(unitTypes.unitTypes)) {
+    if (!Object.hasOwn(deploymentProfiles, id)) throw new Error(`game rules is missing deployment profile: ${id}`);
+  }
+  return freezeDefinition(copyDefinition({
+    schemaVersion: schemaVersionOf(source, 'game rules'),
+    contentVersion: Number(source.contentVersion) || 1,
+    id: source.id,
+    requires: source.requires,
+    deployment: source.deployment || {},
+    configDefaults: source.configDefaults || {},
+    simultaneous: source.simultaneous || {},
+    victory: source.victory || {},
+    turn: source.turn || {},
+    ui: source.ui || {}
+  }));
+}
+
+function normalizeScenarioRulesDefinition(raw, dependencies, board) {
+  const source = deserializeDefinition(raw, 'scenario rules');
+  if (!validDefinitionId(source.id)) throw new Error('scenario rules has an invalid id');
+  for (const [key, expected] of Object.entries(dependencies)) {
+    if (key === 'unitTypeDefinitions') continue;
+    if (source.requires?.[key] !== expected) {
+      throw new Error(`scenario rules requires ${key} ${source.requires?.[key] || '(missing)'}`);
+    }
+  }
+  const boardCells = new Set(board.rows.flatMap(row => row.cells.map(cell => `${row.id},${cell.col}`)));
+  const regions = {};
+  for (const [id, value] of Object.entries(source.regions || {})) {
+    if (!validDefinitionId(id) || !value || typeof value !== 'object') throw new Error(`scenario rules has an invalid region: ${id}`);
+    const seen = new Set();
+    const cells = [];
+    for (const coordinate of value.cells || []) {
+      const cell = parseCoordinate(coordinate);
+      if (!cell) throw new Error(`scenario region ${id} contains an invalid coordinate`);
+      const cellKey = `${cell.row},${cell.col}`;
+      if (!boardCells.has(cellKey)) throw new Error(`scenario region ${id} references unknown cell: ${cellKey}`);
+      if (!seen.has(cellKey)) { seen.add(cellKey); cells.push(cell); }
+    }
+    if (!cells.length) throw new Error(`scenario region ${id} is empty`);
+    regions[id] = {
+      name: String(value.name || id),
+      shortLabel: String(value.shortLabel || value.name || id).slice(0, 8),
+      kind: String(value.kind || ''),
+      color: String(value.color || ''),
+      borderColor: String(value.borderColor || ''),
+      cells
+    };
+  }
+  const areaBindings = source.deployment?.areaBindings || {};
+  for (const player of ['attacker', 'defender']) {
+    if (!validDefinitionId(areaBindings[player]) || !Object.hasOwn(regions, areaBindings[player])) {
+      throw new Error(`scenario deployment is missing a valid ${player} area binding`);
+    }
+  }
+  const targetRegion = source.victory?.attackerTargetRegion;
+  if (!validDefinitionId(targetRegion) || !Object.hasOwn(regions, targetRegion)) {
+    throw new Error('scenario victory is missing a valid attacker target region');
+  }
+  const unitProfiles = source.deployment?.unitProfiles || {};
+  for (const [id, profile] of Object.entries(unitProfiles)) {
+    if (!Object.hasOwn(dependencies.unitTypeDefinitions, id)) throw new Error(`scenario rules references unknown unit type: ${id}`);
+    const players = Array.isArray(profile?.allowedPlayers) ? profile.allowedPlayers : [];
+    if (players.some(player => player !== 'attacker' && player !== 'defender')) throw new Error(`scenario rules has an invalid player in ${id}.allowedPlayers`);
+  }
+  return freezeDefinition(copyDefinition({
+    schemaVersion: schemaVersionOf(source, 'scenario rules'),
+    contentVersion: Number(source.contentVersion) || 1,
+    id: source.id,
+    requires: source.requires,
+    regions,
+    deployment: { areaBindings, unitProfiles },
+    configDefaults: source.configDefaults || {},
+    victory: source.victory || {}
+  }));
+}
+
+function assembleBattleDefinition(catalogEntry) {
+  const manifest = normalizeBattleManifest(loadReferencedDefinition(catalogEntry.manifest, `battle ${catalogEntry.id} manifest`), catalogEntry.id);
+  if (!manifest.enabled || !catalogEntry.enabled) return null;
+
+  const terrainTypes = normalizeTerrainTypesDefinition(loadReferencedDefinition(manifest.resources.terrainTypes, `${manifest.id}.terrainTypes`));
+  const unitTypes = normalizeUnitTypesDefinition(loadReferencedDefinition(manifest.resources.unitTypes, `${manifest.id}.unitTypes`));
+  const combatRules = normalizeCombatRulesDefinition(
+    loadReferencedDefinition(manifest.resources.combatRules, `${manifest.id}.combatRules`),
+    terrainTypes,
+    unitTypes
+  );
+  const gameRules = normalizeGameRulesDefinition(
+    loadReferencedDefinition(manifest.resources.gameRules, `${manifest.id}.gameRules`),
+    combatRules,
+    unitTypes
+  );
+  const aiProfile = manifest.resources.aiProfile
+    ? normalizeAiProfileDefinition(loadReferencedDefinition(manifest.resources.aiProfile, `${manifest.id}.aiProfile`), terrainTypes, unitTypes)
+    : null;
+  const rawMap = loadReferencedDefinition(manifest.resources.map, `${manifest.id}.map`);
+  if (rawMap.terrainTypeSet !== terrainTypes.id) throw new Error(`map requires terrain types ${rawMap.terrainTypeSet || '(missing)'}`);
+  const baseBoard = normalizeBoardDefinition({ ...rawMap, deploymentRows: gameRules.deployment.rows || {} });
+  const scenarioRules = manifest.resources.scenarioRules
+    ? normalizeScenarioRulesDefinition(
+      loadReferencedDefinition(manifest.resources.scenarioRules, `${manifest.id}.scenarioRules`),
+      {
+        terrainTypes: terrainTypes.id,
+        unitTypes: unitTypes.id,
+        map: baseBoard.id,
+        combatRules: combatRules.id,
+        gameRules: gameRules.id,
+        unitTypeDefinitions: unitTypes.unitTypes
+      },
+      baseBoard
+    )
+    : null;
+  const deploymentAreas = scenarioRules
+    ? Object.fromEntries(['attacker', 'defender'].map(player => [player, scenarioRules.regions[scenarioRules.deployment.areaBindings[player]].cells]))
+    : {};
+  const board = scenarioRules
+    ? freezeDefinition({ ...baseBoard, deploymentRows: {}, deploymentAreas, regions: scenarioRules.regions })
+    : baseBoard;
+  for (const row of board.rows) {
+    for (const cell of row.cells) {
+      if (!Object.hasOwn(terrainTypes.terrainTypes, cell.terrain)) {
+        throw new Error(`map cell ${row.id},${cell.col} references unknown terrain type: ${cell.terrain}`);
+      }
+    }
+  }
+
+  const combinedUnits = {};
+  for (const [id, identity] of Object.entries(unitTypes.unitTypes)) {
+    combinedUnits[id] = {
+      ...identity,
+      ...combatRules.unitProfiles[id],
+      ...gameRules.deployment.unitProfiles[id],
+      ...(scenarioRules?.deployment.unitProfiles[id] || {}),
+      ai: aiProfile?.evaluation.unitProfiles[id] || {}
+    };
+  }
+  const units = normalizeUnitsDefinition({ id: unitTypes.id, units: combinedUnits });
+
+  const combinedTerrain = {};
+  for (const [id, identity] of Object.entries(terrainTypes.terrainTypes)) {
+    combinedTerrain[id] = { ...identity, ...combatRules.terrainProfiles[id] };
+  }
+  const runtimeAi = { ...(aiProfile?.evaluation || {}) };
+  delete runtimeAi.unitProfiles;
+  const scenarioVictory = scenarioRules ? {
+    attackerTargetCells: scenarioRules.regions[scenarioRules.victory.attackerTargetRegion].cells,
+    attackerTargetReason: String(scenarioRules.victory.reason || 'attacker_reached_target_region'),
+    messages: { ...(gameRules.victory.messages || {}), ...(scenarioRules.victory.messages || {}) }
+  } : {};
+  const rules = normalizeRulesDefinition({
+    schemaVersion: 1,
+    id: manifest.id,
+    version: manifest.contentVersion,
+    terrain: combinedTerrain,
+    combat: combatRules.combat,
+    configDefaults: { ...gameRules.configDefaults, ...(scenarioRules?.configDefaults || {}) },
+    simultaneous: gameRules.simultaneous,
+    victory: { ...gameRules.victory, ...scenarioVictory },
+    ai: { ...runtimeAi, profile: aiProfile },
+    turn: gameRules.turn,
+    ui: gameRules.ui
+  }, units);
+
+  const runtimeVariant = freezeDefinition({
+    id: manifest.id,
+    name: manifest.name,
+    category: manifest.category,
+    enabled: true,
+    engine: manifest.engine,
+    supportsAi: manifest.supportsAi,
+    aiProfileId: aiProfile?.id || null,
+    boardPath: manifest.resources.map.path,
+    unitsPath: manifest.resources.unitTypes.path,
+    rulesPath: manifest.resources.gameRules.path,
+    boardId: board.id
+  });
+  return freezeDefinition({
+    variant: runtimeVariant,
+    manifest,
+    terrainTypes,
+    unitTypes,
+    combatRules,
+    gameRules,
+    aiProfile,
+    scenarioRules,
+    board,
+    units,
+    rules
+  });
+}
+
+const BATTLE_CATALOG = normalizeBattleCatalog(loadSerializedDefinition('battle-catalog.json'));
 const VARIANT_DEFINITIONS = {};
 const BOARD_DEFINITIONS = {};
-for (const [id, variant] of Object.entries(VARIANT_CATALOG)) {
-  if (!variant.enabled) continue;
+for (const [id, catalogEntry] of Object.entries(BATTLE_CATALOG)) {
+  if (!catalogEntry.enabled) continue;
   try {
-    const units = normalizeUnitsDefinition(loadSerializedDefinition(variant.unitsPath));
-    const rules = normalizeRulesDefinition(loadSerializedDefinition(variant.rulesPath), units);
-    const board = normalizeBoardDefinition(loadSerializedDefinition(variant.boardPath));
-    const runtimeVariant = freezeDefinition({ ...variant, boardId: board.id });
-    VARIANT_DEFINITIONS[id] = freezeDefinition({ variant: runtimeVariant, board, units, rules });
-    BOARD_DEFINITIONS[board.id] = board;
+    const definitions = assembleBattleDefinition(catalogEntry);
+    if (!definitions) continue;
+    VARIANT_DEFINITIONS[id] = definitions;
+    BOARD_DEFINITIONS[definitions.board.id] = definitions.board;
   } catch (err) {
-    console.error(`[DEFINITIONS] Skipping variant ${id}:`, err.message);
+    console.error(`[DEFINITIONS] Skipping battle ${id}:`, err.message);
   }
 }
 if (!VARIANT_DEFINITIONS.classic) throw new Error('classic variant definitions are required');
@@ -253,7 +737,8 @@ function definitionsForVariant(variantId) {
     variant: definitions.variant,
     board: definitions.board,
     units: definitions.units,
-    rules: definitions.rules
+    rules: definitions.rules,
+    aiProfile: definitions.aiProfile
   };
 }
 
@@ -273,7 +758,22 @@ function variantCatalogForClient() {
 
 function deploymentRowFor(g, player) {
   const board = BOARD_DEFINITIONS[g?.boardId] || boardForVariant(g?.variantId);
-  return board.deploymentRows?.[player] ?? (player === 'attacker' ? 6 : 1);
+  const explicit = board.deploymentRows?.[player];
+  if (isBoardRow(Number(explicit))) return Number(explicit);
+  const rows = new Set((board.deploymentAreas?.[player] || []).map(cell => Number(cell.row)));
+  return rows.size === 1 ? [...rows][0] : null;
+}
+
+function deploymentCellsFor(g, player) {
+  const board = BOARD_DEFINITIONS[g?.boardId] || boardForVariant(g?.variantId);
+  const area = board.deploymentAreas?.[player];
+  if (Array.isArray(area) && area.length) return area.map(cell => ({ row: Number(cell.row), col: Number(cell.col) }));
+  const row = deploymentRowFor(g, player);
+  return (board.rows.find(item => item.id === row)?.cells || []).map(cell => ({ row, col: cell.col }));
+}
+
+function isDeploymentCell(g, player, row, col) {
+  return deploymentCellsFor(g, player).some(cell => cell.row === row && cell.col === col);
 }
 
 const rooms = new Map();
@@ -319,11 +819,11 @@ function terrainRuleFor(g, row, col) {
 
 function isInstantKill(g, attacker, target) {
   const rule = g.rules?.combat?.instantKill;
-  if (!rule || !Array.isArray(rule.attackerTypes) || !Array.isArray(rule.targetTypes)) return false;
-  if (!rule.attackerTypes.includes(attacker.type) || !rule.targetTypes.includes(target.type)) return false;
-  return !Array.isArray(rule.terrainTypes)
-    || rule.terrainTypes.length === 0
-    || rule.terrainTypes.includes(terrainIdAt(target.row, target.col, g.boardId));
+  if (!rule || !Array.isArray(rule.attackerTypes) || !rule.attackerTypes.includes(attacker.type)) return false;
+  const targetMatches = Array.isArray(rule.targetTypes) && rule.targetTypes.includes(target.type);
+  const terrainMatches = Array.isArray(rule.terrainTypes)
+    && rule.terrainTypes.includes(terrainIdAt(target.row, target.col, g.boardId));
+  return targetMatches || terrainMatches;
 }
 
 /*
@@ -410,7 +910,6 @@ function canSelectUnit(g, unit, player) {
 function legalDeployments(g, player) {
   if ((player !== 'attacker' && player !== 'defender') || g.state !== 'playing') return [];
   if (g.turnMode === 'simultaneous' && (g.phase !== 'planning' || g.plans?.[player]?.submitted)) return [];
-  const row = deploymentRowFor(g, player);
   const plan = g.turnMode === 'simultaneous' ? (g.plans?.[player] || createSimultaneousPlan()) : null;
   const pending = plan?.deployments || [];
   const hasAllowedType = Object.entries(g.rules?.units || {}).some(([type, definition]) => {
@@ -419,9 +918,8 @@ function legalDeployments(g, player) {
     return countType(g, player, type) + pending.filter(item => item.type === type).length < max;
   });
   if (!hasAllowedType || (player === 'attacker' && g.attackerReinforcement - pending.length <= 0)) return [];
-  return (boardDefinition(g.boardId).rows.find(item => item.id === row)?.cells || [])
-    .filter(cell => !unitAt(g, row, cell.col) && !pending.some(item => item.row === row && item.col === cell.col))
-    .map(cell => ({ row, col: cell.col }));
+  return deploymentCellsFor(g, player)
+    .filter(cell => !unitAt(g, cell.row, cell.col) && !pending.some(item => item.row === cell.row && item.col === cell.col));
 }
 
 function addLog(g, text) {
@@ -442,7 +940,7 @@ function serializePlan(plan) {
 
 function deserializePlan(serialized) {
   const source = deserializeDefinition(serialized, 'plan');
-  const deployments = Array.isArray(source.deployments) ? source.deployments.slice(0, 100).map(item => ({ type: String(item?.type || ''), row: Number(item?.row), col: Number(item?.col) })).filter(item => item.type && Number.isInteger(item.row) && Number.isInteger(item.col)) : [];
+  const deployments = Array.isArray(source.deployments) ? source.deployments.slice(0, 100).map(item => ({ type: String(item?.type || ''), row: Number(item?.row), col: Number(item?.col) })).filter(item => item.type && isBoardRow(item.row) && Number.isInteger(item.col)) : [];
   const actions = {};
   const rawActions = source.actions && typeof source.actions === 'object' ? source.actions : {};
   for (const [id, item] of Object.entries(rawActions).slice(0, 200)) {
@@ -450,7 +948,7 @@ function deserializePlan(serialized) {
     if (!Number.isInteger(unitId)) continue;
     const action = { unitId };
     if (item.shootTargetId != null && Number.isInteger(Number(item.shootTargetId))) action.shootTargetId = Number(item.shootTargetId);
-    if (item.moveTo && Number.isInteger(Number(item.moveTo.row)) && Number.isInteger(Number(item.moveTo.col))) action.moveTo = { row: Number(item.moveTo.row), col: Number(item.moveTo.col) };
+    if (item.moveTo && isBoardRow(Number(item.moveTo.row)) && Number.isInteger(Number(item.moveTo.col))) action.moveTo = { row: Number(item.moveTo.row), col: Number(item.moveTo.col) };
     if (item.end === true) action.end = true;
     actions[unitId] = action;
   }
@@ -504,8 +1002,8 @@ function stairsEntryAllowed(g, unit, tr, tc) {
     return !unit.shot || !!unit.lastShotTarget && unit.lastShotTarget.row === tr && unit.lastShotTarget.col === tc;
   }
   if (specialEntry.unitType && specialEntry.unitType !== unit.type) return true;
-  if (Number.isInteger(Number(specialEntry.fromRow)) && Number(specialEntry.fromRow) !== unit.row) return true;
-  if (Number.isInteger(Number(specialEntry.toRow)) && Number(specialEntry.toRow) !== tr) return true;
+  if (isBoardRow(Number(specialEntry.fromRow)) && Number(specialEntry.fromRow) !== unit.row) return true;
+  if (isBoardRow(Number(specialEntry.toRow)) && Number(specialEntry.toRow) !== tr) return true;
   if (specialEntry.requiresShotTarget !== true || !unit.shot) return true;
   return !!unit.lastShotTarget && unit.lastShotTarget.row === tr && unit.lastShotTarget.col === tc;
 }
@@ -594,15 +1092,26 @@ function resetTurnForCurrentPlayer(g) {
   }
 }
 
+function attackerVictoryCells(g) {
+  const explicit = g.rules?.victory?.attackerTargetCells;
+  if (Array.isArray(explicit) && explicit.length) return explicit;
+  const targetRow = Number(g.rules?.victory?.attackerTargetRow);
+  if (!Number.isInteger(targetRow)) return [];
+  return (boardDefinition(g.boardId).rows.find(row => row.id === targetRow)?.cells || []).map(cell => ({ row: targetRow, col: cell.col }));
+}
+
+function isAttackerVictoryCell(g, row, col) {
+  return attackerVictoryCells(g).some(cell => Number(cell.row) === row && Number(cell.col) === col);
+}
+
 function checkEnd(g) {
-  const attackerTargetRow = Number(g.rules?.victory?.attackerTargetRow) || 1;
-  const a1 = g.units.find(u => u.player === 'attacker' && u.row === attackerTargetRow);
+  const a1 = g.units.find(u => u.player === 'attacker' && isAttackerVictoryCell(g, u.row, u.col));
   if (a1) {
     g.state = 'ended';
     g.phase = 'ended';
     g.winner = 'attacker';
-    g.winnerReason = 'attacker_reached_first_row';
-    addLog(g, `进攻方 ${unitDefinition(a1.type, g)?.name || a1.type}#${a1.id} 到达目标行，进攻方胜利。`);
+    g.winnerReason = String(g.rules?.victory?.attackerTargetReason || 'attacker_reached_first_row');
+    addLog(g, `进攻方 ${unitDefinition(a1.type, g)?.name || a1.type}#${a1.id} 到达目标区域，进攻方胜利。`);
     setEvent(g, { type: 'win', winner: 'attacker', unitId: a1.id });
     return true;
   }
@@ -622,11 +1131,10 @@ function deploy(g, player, type, row, col) {
   if (g.state !== 'playing') throw new Error('游戏尚未开始或已经结束');
   if (g.currentPlayer !== player) throw new Error('尚未轮到你');
   if (!unitDefinition(type, g)) throw new Error('未知兵种');
-  const targetRow = deploymentRowFor(g, player);
-  if (row !== targetRow) throw new Error(`只能部署在第${targetRow}行`);
+  if (!isDeploymentCell(g, player, row, col)) throw new Error('只能部署在本方部署区域');
   if (!validCell(row, col, g.boardId)) throw new Error('无效格子');
   if (unitAt(g, row, col)) throw new Error('该位置已有单位');
-  if (!unitDefinition(type)?.allowedPlayers?.includes(player)) throw new Error('该阵营不能部署此兵种');
+  if (!unitDefinition(type, g)?.allowedPlayers?.includes(player)) throw new Error('该阵营不能部署此兵种');
   const max = g.config[player === 'attacker' ? 'attackerMax' : 'defenderMax'][type] ?? 0;
   if (countType(g, player, type) >= max) throw new Error('该兵种已达到房主设置的上限');
   if (player === 'attacker' && g.attackerReinforcement <= 0) throw new Error('增援已经耗尽');
@@ -661,8 +1169,7 @@ function move(g, player, id, row, col) {
   addLog(g, `${player === 'attacker' ? '进攻方' : '防守方'}${unitDefinition(u.type, g)?.name || u.type}#${u.id}移动到(${row},${displayCol(row, col, g.boardId)})。`);
   setEvent(g, { type: 'move', unitId: u.id, unitType: u.type, from, to: { row, col }, distance: target.distance });
 
-  const attackerTargetRow = Number(g.rules?.victory?.attackerTargetRow) || 1;
-  if (player === 'attacker' && row === attackerTargetRow) { checkEnd(g); return; }
+  if (player === 'attacker' && isAttackerVictoryCell(g, row, col)) { checkEnd(g); return; }
   finishAction(g, u);
 }
 
@@ -754,8 +1261,7 @@ function planSimultaneousDeploy(g, player, type, row, col) {
   const plan = ensureSimultaneousPlanning(g, player);
   const definition = unitDefinition(type, g);
   if (!definition) throw new Error('未知兵种');
-  const targetRow = deploymentRowFor(g, player);
-  if (row !== targetRow) throw new Error(`只能部署在第${targetRow}行`);
+  if (!isDeploymentCell(g, player, row, col)) throw new Error('只能部署在本方部署区域');
   if (!validCell(row, col, g.boardId)) throw new Error('无效格子');
   if (unitAt(g, row, col) || plannedDeploymentAt(plan, row, col)) throw new Error('该位置已被占用或已计划部署');
   if (!definition.allowedPlayers?.includes(player)) throw new Error('该阵营不能部署此兵种');
@@ -774,7 +1280,7 @@ function planSimultaneousAction(g, player, actionType, unitId, row, col, targetI
   const existing = { ...(plan.actions[unit.id] || { unitId: unit.id }), moveTo: plan.actions[unit.id]?.moveTo ? { ...plan.actions[unit.id].moveTo } : undefined };
   if (existing.end) throw new Error('该单位已结束规划');
   if (actionType === 'move') {
-    if (!Number.isInteger(row) || !Number.isInteger(col)) throw new Error('移动目标无效');
+    if (!isBoardRow(row) || !Number.isInteger(col)) throw new Error('移动目标无效');
     if (!moveTargets(g, unit).some(item => item.row === row && item.col === col)) throw new Error('不可移动到该位置');
     existing.moveTo = { row, col };
   } else if (actionType === 'shoot') {
@@ -821,7 +1327,7 @@ function resolveSimultaneousRound(g) {
       const deploymentKey = `${player}:${item.row},${item.col}`;
       if (!definition || deploymentSeen.has(deploymentKey)) continue;
       deploymentSeen.add(deploymentKey);
-      if (!definition.allowedPlayers?.includes(player) || deploymentRowFor(g, player) !== item.row || !validCell(item.row, item.col, g.boardId)) continue;
+      if (!definition.allowedPlayers?.includes(player) || !isDeploymentCell(g, player, item.row, item.col) || !validCell(item.row, item.col, g.boardId)) continue;
       if (unitAt(g, item.row, item.col)) continue;
       pendingCounts[item.type] = (pendingCounts[item.type] || 0) + 1;
       if (countType(g, player, item.type) + pendingCounts[item.type] > (maxima[item.type] ?? 0)) { pendingCounts[item.type]--; continue; }
@@ -993,7 +1499,7 @@ function scheduleSimultaneousDeadline(room) {
     if (submitEmptyPlansOnTimeout(room)) {
       broadcast(room);
       broadcastLobby();
-      scheduleBotTurn(room, BOT_STEP_DELAY);
+      scheduleBotTurn(room);
     }
   }, delay || 120000);
 }
@@ -1133,23 +1639,41 @@ function randomChoice(items) {
   return items.length ? items[Math.floor(Math.random() * items.length)] : null;
 }
 
-const BOT_PROFILES = {
-  easy: { topChoices: 4, dangerWeight: 0.25, mobilityWeight: 0.5 },
-  normal: { topChoices: 2, dangerWeight: 0.75, mobilityWeight: 1 },
-  hard: { topChoices: 1, dangerWeight: 1.2, mobilityWeight: 1.25 }
-};
+function aiProfileFor(g = null, variantId = 'classic') {
+  return g?.rules?.ai?.profile || definitionsForVariant(variantId).aiProfile;
+}
 
-function normalizeBotDifficulty(value) {
-  return Object.hasOwn(BOT_PROFILES, value) ? value : 'normal';
+function normalizeBotDifficulty(value, variantId = 'classic') {
+  const profile = aiProfileFor(null, variantId);
+  return Object.hasOwn(profile.difficulties, value) ? value : profile.defaultDifficulty;
+}
+
+function botDifficultyProfile(g, difficulty) {
+  const aiProfile = aiProfileFor(g, g?.variantId);
+  return aiProfile.difficulties[Object.hasOwn(aiProfile.difficulties, difficulty) ? difficulty : aiProfile.defaultDifficulty];
+}
+
+function botExecutionProfile(g) {
+  return aiProfileFor(g, g?.variantId).execution;
 }
 
 function opponentOf(player) {
   return player === 'attacker' ? 'defender' : 'attacker';
 }
 
+const GRAPH_DISTANCE_CACHE = new Map();
+
 function graphDistance(fromRow, fromCol, toRow, toCol, boardId = 'classic') {
   if (fromRow === toRow && fromCol === toCol) return 0;
-  return bfs(fromRow, fromCol, 12, boardId).get(key(toRow, toCol)) ?? 99;
+  const cacheKey = `${boardId}:${fromRow},${fromCol}`;
+  let distances = GRAPH_DISTANCE_CACHE.get(cacheKey);
+  if (!distances) {
+    const board = boardDefinition(boardId);
+    const cellCount = board.rows.reduce((total, row) => total + row.cells.length, 0);
+    distances = bfs(fromRow, fromCol, cellCount, boardId);
+    GRAPH_DISTANCE_CACHE.set(cacheKey, distances);
+  }
+  return distances.get(key(toRow, toCol)) ?? Number.MAX_SAFE_INTEGER;
 }
 
 function unitValue(type, g = null) {
@@ -1179,21 +1703,20 @@ function shotWouldKill(g, attacker, target) {
   return target.hits >= (Number(g.rules?.combat?.hitsToDestroy) || 2) - 1;
 }
 
-function chooseRanked(items, difficulty) {
+function chooseRanked(items, difficulty, g = null) {
   if (!items.length) return null;
-  const profile = BOT_PROFILES[normalizeBotDifficulty(difficulty)];
-  const ranked = [...items].sort((a, b) => b.score - a.score);
-  const bestScore = ranked[0].score;
-  const nearBest = ranked.filter(item => item.score >= bestScore - (difficulty === 'easy' ? 80 : 12));
+  const profile = botDifficultyProfile(g, difficulty);
+  const scoreOf = item => Number(item.searchScore ?? item.score) || 0;
+  const ranked = [...items].sort((a, b) => scoreOf(b) - scoreOf(a));
+  const bestScore = scoreOf(ranked[0]);
+  const nearBest = ranked.filter(item => scoreOf(item) >= bestScore - profile.nearBestWindow);
   return randomChoice(nearBest.slice(0, profile.topChoices));
 }
 
 function botDeployChoices(g, player) {
   if (player === 'attacker' && g.attackerReinforcement <= 0) return [];
-  const row = deploymentRowFor(g, player);
-  const rowDef = boardDefinition(g.boardId).rows.find(item => item.id === row);
-  const emptyCols = (rowDef?.cells || []).map(cell => cell.col).filter(col => !unitAt(g, row, col));
-  if (!emptyCols.length) return [];
+  const emptyCells = deploymentCellsFor(g, player).filter(cell => !unitAt(g, cell.row, cell.col));
+  if (!emptyCells.length) return [];
 
   const maxima = g.config[player === 'attacker' ? 'attackerMax' : 'defenderMax'];
   const enemies = alive(g, opponentOf(player));
@@ -1202,7 +1725,8 @@ function botDeployChoices(g, player) {
   return Object.keys(g.rules?.units || {}).flatMap(type => {
     if (!unitDefinition(type, g)?.allowedPlayers?.includes(player)) return [];
     if (countType(g, player, type) >= (maxima[type] ?? 0)) return [];
-    return emptyCols.map(col => {
+    return emptyCells.map(cell => {
+      const { row, col } = cell;
       let score = unitValue(type, g) + 15;
       score -= countType(g, player, type) * 9;
       score += 10 - Math.abs(col - 2) * 4;
@@ -1218,7 +1742,7 @@ function botDeployChoices(g, player) {
 }
 
 function chooseBotDeployment(g, player, difficulty) {
-  return chooseRanked(botDeployChoices(g, player), difficulty);
+  return chooseRanked(botDeployChoices(g, player), difficulty, g);
 }
 
 function threatAt(g, unit, row, col) {
@@ -1232,8 +1756,7 @@ function threatAt(g, unit, row, col) {
 }
 
 function defensiveBlockValue(g, row, col) {
-  const targetRow = Number(g.rules?.victory?.attackerTargetRow);
-  if (!Number.isInteger(targetRow) || row !== targetRow) return 0;
+  if (!isAttackerVictoryCell(g, row, col)) return 0;
   let value = 0;
   for (const attacker of alive(g, 'attacker')) {
     if (neighbors(attacker.row, attacker.col, g.boardId).some(([r, c]) => r === row && c === col)) value += 800;
@@ -1251,23 +1774,30 @@ function scoreShot(g, attacker, target) {
   if (target.hits > 0) score += 125;
   if (kill) score += 560 + unitValue(target.type, g) * 2;
   if (target.player === 'attacker') {
-    const targetRowScores = g.rules?.ai?.targetRowScores || {};
-    score += Number(targetRowScores[String(target.row)] || 0);
+    const goalDistance = Math.min(...attackerVictoryCells(g).map(cell => graphDistance(target.row, target.col, Number(cell.row), Number(cell.col), g.boardId)));
+    const distanceScores = g.rules?.ai?.attackerThreatScoresByGoalDistance || {};
+    score += Number(distanceScores[String(goalDistance)] || 0);
   }
   score += aiCombatBonus(g, attacker, target, target.row, target.col);
   return { score, priority: kill ? 'kill' : 'hit' };
 }
 
 function scoreMove(g, unit, target, difficulty) {
-  const profile = BOT_PROFILES[normalizeBotDifficulty(difficulty)];
+  const profile = botDifficultyProfile(g, difficulty);
   const enemies = alive(g, opponentOf(unit.player));
   let score = -target.distance * 2;
 
   if (unit.player === 'attacker') {
-    const attackerTargetRow = Number(g.rules?.victory?.attackerTargetRow) || 1;
-    if (target.row === attackerTargetRow) return { score: 100000, priority: 'win' };
-    score += (unit.row - target.row) * 62;
-    score += (Math.max(...boardDefinition(g.boardId).rows.map(row => row.id)) - target.row) * 4;
+    if (isAttackerVictoryCell(g, target.row, target.col)) return { score: 100000, priority: 'win' };
+    const explicitTargets = g.rules?.victory?.attackerTargetCells;
+    if (Array.isArray(explicitTargets) && explicitTargets.length) {
+      const before = Math.min(...explicitTargets.map(cell => graphDistance(unit.row, unit.col, Number(cell.row), Number(cell.col), g.boardId)));
+      const after = Math.min(...explicitTargets.map(cell => graphDistance(target.row, target.col, Number(cell.row), Number(cell.col), g.boardId)));
+      score += (before - after) * 62;
+    } else {
+      score += (unit.row - target.row) * 62;
+      score += (Math.max(...boardDefinition(g.boardId).rows.map(row => row.id)) - target.row) * 4;
+    }
     const terrainScores = g.rules?.ai?.terrainScores || {};
     score += Number(terrainScores[terrainAt(target.row, target.col, g.boardId)] || 0);
   } else if (enemies.length) {
@@ -1275,7 +1805,6 @@ function scoreMove(g, unit, target, difficulty) {
     const after = Math.min(...enemies.map(enemy => graphDistance(target.row, target.col, enemy.row, enemy.col, g.boardId)));
     score += (before - after) * 34;
     score += defensiveBlockValue(g, target.row, target.col) - defensiveBlockValue(g, unit.row, unit.col);
-    score += Number((g.rules?.ai?.defenderRowScore || {})[String(target.row)] || 0);
   }
 
   if (!unit.shot) {
@@ -1315,13 +1844,65 @@ function botActionChoices(g, player, difficulty) {
   return actions;
 }
 
+function cloneGameForBotSearch(g) {
+  return {
+    ...g,
+    units: g.units.map(unit => ({ ...unit, lastShotTarget: unit.lastShotTarget ? { ...unit.lastShotTarget } : null })),
+    log: [],
+    lastEvent: null,
+    spectators: new Set()
+  };
+}
+
+function applyBotAction(g, player, action) {
+  if (action.type === 'shoot') shoot(g, player, action.unitId, action.targetId);
+  else if (action.type === 'move') move(g, player, action.unitId, action.row, action.col);
+  else endUnit(g, player, action.unitId);
+}
+
+function searchBotActions(g, player, difficulty, choices) {
+  const profile = botDifficultyProfile(g, difficulty);
+  if (profile.searchDepth < 2 || profile.futureDiscount <= 0) return choices;
+  const deadline = Date.now() + profile.timeBudgetMs;
+  const roots = [...choices]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, profile.maxRootCandidates);
+  const evaluated = [];
+  let nodes = 0;
+
+  for (const action of roots) {
+    if (nodes >= profile.maxNodes || Date.now() > deadline) break;
+    const simulated = cloneGameForBotSearch(g);
+    try {
+      applyBotAction(simulated, player, action);
+      nodes++;
+    } catch (_) {
+      continue;
+    }
+
+    let futureScore = 0;
+    if (simulated.state === 'playing') {
+      const continuations = botActionChoices(simulated, player, difficulty)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, Math.min(profile.maxBranching, profile.maxNodes - nodes));
+      for (const continuation of continuations) {
+        if (nodes >= profile.maxNodes || Date.now() > deadline) break;
+        futureScore = Math.max(futureScore, continuation.score);
+        nodes++;
+      }
+    }
+    evaluated.push({ ...action, searchScore: action.score + futureScore * profile.futureDiscount });
+  }
+  return evaluated.length ? evaluated : choices;
+}
+
 function chooseBotAction(g, player, difficulty) {
   const choices = botActionChoices(g, player, difficulty);
   const winning = choices.filter(action => action.priority === 'win');
-  if (winning.length) return chooseRanked(winning, 'hard');
+  if (winning.length) return chooseRanked(winning, 'hard', g);
   const kills = choices.filter(action => action.priority === 'kill');
-  if (kills.length) return chooseRanked(kills, difficulty);
-  return chooseRanked(choices, difficulty);
+  if (kills.length) return chooseRanked(kills, difficulty, g);
+  return chooseRanked(searchBotActions(g, player, difficulty, choices), difficulty, g);
 }
 
 function buildBotSimultaneousPlan(g, player, difficulty) {
@@ -1330,8 +1911,9 @@ function buildBotSimultaneousPlan(g, player, difficulty) {
   const counts = Object.fromEntries(Object.keys(g.rules?.units || {}).map(type => [type, countType(g, player, type)]));
   const maxima = g.config[player === 'attacker' ? 'attackerMax' : 'defenderMax'] || {};
   let reinforcement = g.attackerReinforcement;
-  for (let i = 0; i < BOT_MAX_STEPS_PER_TURN; i++) {
-    const choice = chooseRanked(botDeployChoices(g, player).filter(item => !blockedCells.has(key(item.row, item.col))), difficulty);
+  const execution = botExecutionProfile(g);
+  for (let i = 0; i < execution.maxStepsPerTurn; i++) {
+    const choice = chooseRanked(botDeployChoices(g, player).filter(item => !blockedCells.has(key(item.row, item.col))), difficulty, g);
     if (!choice) break;
     if (counts[choice.type] >= (maxima[choice.type] ?? 0)) break;
     if (player === 'attacker' && reinforcement <= 0) break;
@@ -1339,10 +1921,10 @@ function buildBotSimultaneousPlan(g, player, difficulty) {
     blockedCells.add(key(choice.row, choice.col));
     counts[choice.type] = (counts[choice.type] || 0) + 1;
     if (player === 'attacker') reinforcement--;
-    if (plan.deployments.length >= 50) break;
+    if (plan.deployments.length >= execution.maxDeploymentsPerPlan) break;
   }
   for (const unit of g.units.filter(item => item.player === player && item.canAct && item.deployedRound !== g.round)) {
-    const action = chooseRanked(botActionChoices(g, player, difficulty).filter(item => item.unitId === unit.id && item.type !== 'stop'), difficulty);
+    const action = chooseRanked(botActionChoices(g, player, difficulty).filter(item => item.unitId === unit.id && item.type !== 'stop'), difficulty, g);
     if (!action) continue;
     const item = { unitId: unit.id };
     if (action.type === 'shoot') item.shootTargetId = action.targetId;
@@ -1353,9 +1935,9 @@ function buildBotSimultaneousPlan(g, player, difficulty) {
   return plan;
 }
 
-/* The bot scores only the current legal actions and yields between each one. */
-function scheduleBotTurn(room, delay = BOT_STEP_DELAY) {
+function scheduleBotTurn(room, delay = null) {
   if (!room || !room.botRole || room.game.state !== 'playing') return;
+  const effectiveDelay = delay == null ? botExecutionProfile(room.game).stepDelayMs : delay;
   if (room.game.turnMode === 'simultaneous') {
     if (room.game.phase !== 'planning' || room.game.plans?.[room.botRole]?.submitted || room.botTimer) return;
     room.botTimer = setTimeout(() => {
@@ -1368,14 +1950,14 @@ function scheduleBotTurn(room, delay = BOT_STEP_DELAY) {
       broadcast(room);
       broadcastLobby();
       scheduleSimultaneousDeadline(room);
-    }, delay);
+    }, effectiveDelay);
     return;
   }
   if (room.game.currentPlayer !== room.botRole || room.botTimer) return;
   room.botTimer = setTimeout(() => {
     room.botTimer = null;
     runBotStep(room);
-  }, delay);
+  }, effectiveDelay);
 }
 
 function runBotStep(room) {
@@ -1391,7 +1973,7 @@ function runBotStep(room) {
       room.botSteps = 0;
     }
     room.botSteps++;
-    if (room.botSteps > BOT_MAX_STEPS_PER_TURN) {
+    if (room.botSteps > botExecutionProfile(g).maxStepsPerTurn) {
       addLog(g, '机器人达到本回合操作上限，自动结束回合。');
       endTurn(g, player);
       broadcast(room);
@@ -1450,6 +2032,14 @@ function runBotStep(room) {
 const httpServer = http.createServer((req, res) => {
   let p = req.url.split('?')[0];
 
+  if (p === '/') {
+    res.writeHead(302, {
+      Location: `/index.html?v=${CLIENT_ASSET_VERSION}`,
+      'Cache-Control': 'no-store, no-cache, must-revalidate'
+    });
+    return res.end();
+  }
+
   if (p === '/__audio_manifest') {
     try {
       const files = collectAudioFiles(AUDIO_ROOT);
@@ -1473,8 +2063,6 @@ const httpServer = http.createServer((req, res) => {
     res.writeHead(400);
     return res.end('Bad Request');
   }
-
-  if (p === '/') p = '/index.html';
 
   // 使用 path.resolve + path.sep 做目录边界判断，避免 Windows/Linux 路径差异与目录穿越问题。
   const relativePath = p.replace(/^[/\\]+/, '');
@@ -1513,7 +2101,9 @@ const httpServer = http.createServer((req, res) => {
 
     const commonHeaders = {
       'Content-Type': types[ext] || 'application/octet-stream',
-      'Cache-Control': ext.startsWith('.mp') || AUDIO_EXTENSIONS.has(ext) ? 'no-cache' : 'public, max-age=3600',
+      'Cache-Control': ext === '.html'
+        ? 'no-store, no-cache, must-revalidate'
+        : (ext.startsWith('.mp') || AUDIO_EXTENSIONS.has(ext) ? 'no-cache' : 'public, max-age=3600'),
       'Accept-Ranges': AUDIO_EXTENSIONS.has(ext) ? 'bytes' : 'none'
     };
 
@@ -1573,7 +2163,7 @@ wss.on('connection', ws => {
         if (!variant?.enabled) throw new Error('该玩法当前不可用');
         if (gameMode === 'ai' && variant.supportsAi !== true) throw new Error('该玩法暂不支持人机对战');
         const botRole = gameMode === 'ai' ? (hostRole === 'attacker' ? 'defender' : 'attacker') : null;
-        const botDifficulty = normalizeBotDifficulty(m.botDifficulty);
+        const botDifficulty = normalizeBotDifficulty(m.botDifficulty, variantId);
         const config = sanitizeConfig(m.config, variantId);
         const g = newGame(config, hostRole, variantId);
         const id = `room-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -1822,19 +2412,32 @@ if (require.main === module) {
 module.exports = {
   testing: {
     DEFAULT_CONFIG,
+    BATTLE_CATALOG,
     BOARD_DEFINITIONS,
     GAME_VARIANTS,
     GAME_RULES,
     serializeDefinition,
     deserializeDefinition,
     normalizeBoardDefinition,
+    normalizeTerrainTypesDefinition,
+    normalizeUnitTypesDefinition,
     normalizeUnitsDefinition,
+    normalizeCombatRulesDefinition,
+    normalizeGameRulesDefinition,
+    normalizeAiProfileDefinition,
+    normalizeScenarioRulesDefinition,
     normalizeRulesDefinition,
+    normalizeBattleCatalog,
+    normalizeBattleManifest,
     definitionsForVariant,
+    defaultConfigForVariant,
     newGame,
     normalizeVariantId,
     deploymentRowFor,
     createUnit,
+    deploy,
+    move,
+    legalDeployments,
     shoot,
     normalizeBotDifficulty,
     chooseBotDeployment,

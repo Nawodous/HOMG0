@@ -1,6 +1,6 @@
 # 同时回合制
 
-经典模式通过 `data/rules/classic.json` 的 `simultaneous` 节点声明同时回合制能力。创建房间时，前端将 `config.turnMode` 设置为 `simultaneous`；未勾选时使用 `sequential`。
+经典模式通过 `data/game-rules/classic-game.json` 的 `simultaneous` 节点声明同时回合制能力。创建房间时，前端将 `config.turnMode` 设置为 `simultaneous`；未勾选时使用 `sequential`。
 
 ## 回合阶段
 

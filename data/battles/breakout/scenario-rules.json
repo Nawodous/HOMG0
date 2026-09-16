@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "id": "breakout-scenario",
+  "contentVersion": 7,
+  "requires": {
+    "terrainTypes": "classic-terrain",
+    "unitTypes": "classic-units",
+    "map": "breakout",
+    "combatRules": "classic-combat",
+    "gameRules": "classic-game"
+  },
+  "regions": {
+    "attacker-deployment": {
+      "name": "进攻部署",
+      "shortLabel": "攻部署",
+      "kind": "deployment",
+      "color": "#315f88",
+      "borderColor": "#65a1dc",
+      "cells": ["7,0", "7,1", "7,2", "7,3", "7,4", "8,2", "8,3", "8,4", "9,3", "9,4"]
+    },
+    "defender-deployment": {
+      "name": "防守部署",
+      "shortLabel": "防部署",
+      "kind": "deployment",
+      "color": "#78505a",
+      "borderColor": "#df7178",
+      "cells": [
+        "1,1",
+        "2,1", "2,5", "2,6",
+        "5.5,9", "6.5,9", "7.5,9", "8.5,9"
+      ]
+    },
+    "attacker-goal": {
+      "name": "进攻目标",
+      "shortLabel": "攻目标",
+      "kind": "victory",
+      "color": "#7a6730",
+      "borderColor": "#f2cb68",
+      "cells": ["1,1", "2,5", "2,6", "5.5,9", "6.5,9", "7.5,9", "8.5,9"]
+    }
+  },
+  "deployment": {
+    "areaBindings": {
+      "attacker": "attacker-deployment",
+      "defender": "defender-deployment"
+    },
+    "unitProfiles": {
+      "infantry": {
+        "allowedPlayers": ["attacker", "defender"],
+        "deployLimit": { "attacker": 12, "defender": 6 }
+      },
+      "antiTank": {
+        "allowedPlayers": ["attacker", "defender"],
+        "deployLimit": { "attacker": 1, "defender": 2 }
+      },
+      "machineGun": {
+        "allowedPlayers": ["attacker", "defender"],
+        "deployLimit": { "attacker": 0, "defender": 3 }
+      }
+    }
+  },
+  "configDefaults": {
+    "reinforcement": 12
+  },
+  "victory": {
+    "attackerTargetRegion": "attacker-goal",
+    "reason": "attacker_reached_breakout_goal",
+    "messages": {
+      "attacker_reached_breakout_goal": "进攻方战棋到达突围目标区域。"
+    }
+  }
+}

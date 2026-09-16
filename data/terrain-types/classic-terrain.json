@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "classic-terrain",
+  "contentVersion": 1,
+  "terrainTypes": {
+    "plain": {
+      "name": "普通",
+      "color": "#222a35",
+      "borderColor": "#394555",
+      "symbol": ""
+    },
+    "fortress": {
+      "name": "堡垒",
+      "color": "#4c3924",
+      "borderColor": "#a98042",
+      "symbol": "▦"
+    },
+    "stairs": {
+      "name": "楼梯",
+      "color": "#30375a",
+      "borderColor": "#777fc2",
+      "symbol": "⇧"
+    }
+  }
+}

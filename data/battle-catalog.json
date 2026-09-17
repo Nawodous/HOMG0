@@ -15,7 +15,7 @@
       "manifest": {
         "path": "battles/breakout/battle.json",
         "id": "breakout",
-        "contentVersion": 8
+        "contentVersion": 13
       },
       "enabled": true
     }

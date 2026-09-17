@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.webm', '.flac']);
 const AUDIO_ROOT = path.resolve(PUBLIC_DIR, 'audio');
 const DATA_ROOT = path.join(__dirname, 'data');
-const CLIENT_ASSET_VERSION = '20260916-half-row-map-v2';
+const CLIENT_ASSET_VERSION = '20260917-rule-grid-v1';
 
 function serializeDefinition(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
@@ -560,6 +560,17 @@ function normalizeScenarioRulesDefinition(raw, dependencies, board) {
   if (!validDefinitionId(targetRegion) || !Object.hasOwn(regions, targetRegion)) {
     throw new Error('scenario victory is missing a valid attacker target region');
   }
+  const roundLimitSource = source.victory?.roundLimit;
+  let roundLimit = null;
+  if (roundLimitSource != null) {
+    const round = Number(roundLimitSource.round);
+    const winner = String(roundLimitSource.winner || '');
+    const reason = String(roundLimitSource.reason || '');
+    if (!Number.isInteger(round) || round < 1 || round > 100000) throw new Error('scenario victory has an invalid round limit');
+    if (winner !== 'attacker' && winner !== 'defender') throw new Error('scenario victory round limit has an invalid winner');
+    if (!validDefinitionId(reason)) throw new Error('scenario victory round limit has an invalid reason');
+    roundLimit = { round, winner, reason };
+  }
   const unitProfiles = source.deployment?.unitProfiles || {};
   for (const [id, profile] of Object.entries(unitProfiles)) {
     if (!Object.hasOwn(dependencies.unitTypeDefinitions, id)) throw new Error(`scenario rules references unknown unit type: ${id}`);
@@ -574,7 +585,7 @@ function normalizeScenarioRulesDefinition(raw, dependencies, board) {
     regions,
     deployment: { areaBindings, unitProfiles },
     configDefaults: source.configDefaults || {},
-    victory: source.victory || {}
+    victory: { ...(source.victory || {}), roundLimit }
   }));
 }
 
@@ -649,6 +660,7 @@ function assembleBattleDefinition(catalogEntry) {
   const scenarioVictory = scenarioRules ? {
     attackerTargetCells: scenarioRules.regions[scenarioRules.victory.attackerTargetRegion].cells,
     attackerTargetReason: String(scenarioRules.victory.reason || 'attacker_reached_target_region'),
+    roundLimit: scenarioRules.victory.roundLimit,
     messages: { ...(gameRules.victory.messages || {}), ...(scenarioRules.victory.messages || {}) }
   } : {};
   const rules = normalizeRulesDefinition({
@@ -1104,7 +1116,7 @@ function isAttackerVictoryCell(g, row, col) {
   return attackerVictoryCells(g).some(cell => Number(cell.row) === row && Number(cell.col) === col);
 }
 
-function checkEnd(g) {
+function checkEnd(g, { completedRound = null } = {}) {
   const a1 = g.units.find(u => u.player === 'attacker' && isAttackerVictoryCell(g, u.row, u.col));
   if (a1) {
     g.state = 'ended';
@@ -1122,6 +1134,17 @@ function checkEnd(g) {
     g.winnerReason = 'attacker_eliminated';
     addLog(g, '进攻方增援耗尽且场上全灭，防守方胜利。');
     setEvent(g, { type: 'win', winner: 'defender' });
+    return true;
+  }
+  const roundLimit = g.rules?.victory?.roundLimit;
+  if (roundLimit && Number(completedRound) >= Number(roundLimit.round)) {
+    const winner = roundLimit.winner === 'attacker' ? 'attacker' : 'defender';
+    g.state = 'ended';
+    g.phase = 'ended';
+    g.winner = winner;
+    g.winnerReason = String(roundLimit.reason || 'round_limit_reached');
+    addLog(g, `第${roundLimit.round}回合结束，${winner === 'attacker' ? '进攻方' : '防守方'}胜利。`);
+    setEvent(g, { type: 'win', winner, reason: g.winnerReason });
     return true;
   }
   return false;
@@ -1232,11 +1255,12 @@ function endTurn(g, player) {
   if (g.state !== 'playing') throw new Error('游戏已结束');
   addLog(g, `${player === 'attacker' ? '进攻方' : '防守方'}结束回合。`);
 
+  const completedRound = player === 'defender' ? g.round : null;
   g.currentPlayer = player === 'attacker' ? 'defender' : 'attacker';
   if (g.currentPlayer === 'attacker') g.round++;
-  resetTurnForCurrentPlayer(g);
   g.lastEvent = null;
-  checkEnd(g);
+  if (checkEnd(g, { completedRound })) return;
+  resetTurnForCurrentPlayer(g);
   if (g.state === 'playing') addLog(g, `${g.currentPlayer === 'attacker' ? '进攻方' : '防守方'}开始第${g.round}回合。`);
 }
 
@@ -1467,7 +1491,7 @@ function resolveSimultaneousRound(g) {
   }
   for (const unit of g.units) unit.canAct = false;
   setEvent(g, { type: 'simultaneousResolution', phase: 'move', moves: successfulMoves, killed: deadUnits });
-  if (checkEnd(g)) { g.phase = 'ended'; return; }
+  if (checkEnd(g, { completedRound: g.round })) { g.phase = 'ended'; return; }
   g.round++;
   prepareSimultaneousPlanning(g);
 }
@@ -2439,6 +2463,7 @@ module.exports = {
     move,
     legalDeployments,
     shoot,
+    endTurn,
     normalizeBotDifficulty,
     chooseBotDeployment,
     chooseBotAction,

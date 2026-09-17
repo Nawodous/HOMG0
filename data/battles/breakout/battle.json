@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "breakout",
-  "contentVersion": 8,
+  "contentVersion": 13,
   "name": "突围",
   "category": "battle",
   "enabled": true,
@@ -21,7 +21,7 @@
     "map": {
       "path": "maps/breakout.json",
       "id": "breakout",
-      "contentVersion": 4
+      "contentVersion": 8
     },
     "combatRules": {
       "path": "combat-rules/classic-combat.json",
@@ -41,7 +41,7 @@
     "scenarioRules": {
       "path": "battles/breakout/scenario-rules.json",
       "id": "breakout-scenario",
-      "contentVersion": 7
+      "contentVersion": 12
     }
   }
 }

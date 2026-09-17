@@ -45,8 +45,7 @@ button{cursor:pointer}
 @keyframes deployPulse{0%{transform:translate(-50%,-50%) scale(.5);opacity:.1}55%{transform:translate(-50%,-50%) scale(1.13);opacity:1}100%{transform:translate(-50%,-50%) scale(1)}}
 @keyframes deathFlash{0%{opacity:1}40%{opacity:.85;filter:grayscale(1) brightness(1.8)}100%{opacity:0}}@keyframes fxArrowIn{0%{opacity:0;transform:scale(.9)}12%{opacity:1;transform:scale(1)}78%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1)}}@keyframes corpseFade{0%{opacity:0;transform:translate(-50%,-50%) rotate(-18deg) scale(.7)}15%{opacity:1;transform:translate(-50%,-50%) rotate(-18deg) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) rotate(-18deg) scale(.94)}}
 .side{min-width:0;background:#121820;border-left:1px solid #2a3442;padding:14px;display:flex;flex-direction:column;gap:11px;overflow:auto}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.pt{font-size:13px;font-weight:800;margin-bottom:10px}.hint{font-size:12px;line-height:1.6;color:#aeb9c7}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px}.stat{background:#121820;border-radius:8px;padding:8px}.sl{font-size:10px;color:#7f8da0}.sv{margin-top:3px;font-size:13px;font-weight:800}.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.status-grid .stat{padding:7px 8px;min-width:0}.status-wide{grid-column:1/-1}.status-text{font-size:11px;font-weight:500;line-height:1.45;overflow-wrap:anywhere}.status-grid .config-summary{margin-top:3px;line-height:1.45}
-.config-summary{font-size:11px;line-height:1.7;color:#aeb8c6}.unit-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.unit-buttons button{border:0;border-radius:8px;padding:9px 4px;background:#2c3747;color:#e1e7ef}.unit-buttons button.active{background:#5d5d9d}.unit-buttons button:disabled{opacity:.35;cursor:not-allowed}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px}.stat{background:#121820;border-radius:8px;padding:8px}.sl{font-size:10px;color:#7f8da0}.sv{margin-top:3px;font-size:13px;font-weight:800}.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.status-grid .stat{padding:7px 8px;min-width:0}.status-wide{grid-column:1/-1}.status-text{font-size:11px;font-weight:500;line-height:1.45;overflow-wrap:anywhere}.status-rules{grid-column:1/-1;min-width:0}.status-rules>.sl{margin:1px 0 4px}.config-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.rule-box{min-width:0;padding:5px 6px;border:1px solid #303d4f;border-radius:6px;background:#121820}.rule-box-label{font-size:9px;color:#7f8da0;line-height:1.2}.rule-box-value{margin-top:2px;font-size:10px;font-weight:700;color:#d4dce6;line-height:1.25;overflow-wrap:anywhere}.unit-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.unit-buttons button{border:0;border-radius:8px;padding:9px 4px;background:#2c3747;color:#e1e7ef}.unit-buttons button.active{background:#5d5d9d}.unit-buttons button:disabled{opacity:.35;cursor:not-allowed}
 .selection{min-height:80px;font-size:12px;line-height:1.7;color:#bdc7d4}.rowbtn{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}.btn{border:0;border-radius:8px;padding:10px;background:#303c4c;color:#fff}.btn.primary{background:#5969a6}.btn.danger{background:#873f49}.btn:disabled{opacity:.35;cursor:not-allowed}
 .unit-list{display:flex;flex-direction:column;gap:6px;max-height:290px;overflow:auto}.my-units-body.collapsed{display:none}.collapsible-head{width:100%;display:flex;align-items:center;justify-content:space-between;border:0;background:transparent;color:inherit;padding:0;text-align:left}.collapsible-head .chev{color:#8f9bad;font-size:12px}.urow{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;background:#121820;border-radius:8px;padding:7px}.uicon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}.uicon.a{background:#863b47}.uicon.d{background:#376789}.uinfo{font-size:11px}.uname{font-size:12px;font-weight:700}.subline{color:#8492a4;margin-top:2px}.ustate{display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end;max-width:155px}.log{height:180px;overflow:auto;background:#10161d;border-radius:8px;padding:8px;font-size:10px;line-height:1.65;color:#aab5c3}.log.collapsed{display:none}.log-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.log-toggle-icon{width:26px;height:26px;padding:0;border:0;border-radius:7px;background:#222c39;color:#dfe7f1;display:flex;align-items:center;justify-content:center}.log-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;border:0;border-radius:8px;padding:8px 10px;background:#222c39;color:#dfe7f1;font-size:12px}.log-toggle span{color:#8f9bad}.turn-start-overlay{position:fixed;top:72px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(4,8,13,.34);pointer-events:none;opacity:0;z-index:90}
 .game-modal{position:fixed;top:72px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(4,8,13,.48);z-index:120}.game-modal.hidden{display:none}.game-modal-card{width:min(420px,88vw);padding:22px;border:1px solid #4d5d76;border-radius:14px;background:#1b2430;box-shadow:0 22px 70px #000b;text-align:center}.game-modal-title{font-size:18px;font-weight:900}.game-modal-text{margin:10px 0 18px;color:#aeb9c7;font-size:12px;line-height:1.7}.game-modal-card .btn{min-width:120px}
@@ -192,7 +191,7 @@ button{cursor:pointer}
     <div class="board-area"><div id="turnStartOverlay" class="turn-start-overlay"><div class="turn-start-card"><div class="turn-start-label">回合开始</div><div id="turnStartName" class="turn-start-name">进攻方</div></div></div><div id="boardStage" class="board-stage"><div id="board" class="board"><svg id="mapConnections" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:visible"></svg><div id="chatOverlay" class="hidden"><div id="chatTop" class="chat-top"></div><div id="chatBottom" class="chat-bottom"></div></div><div id="fxLayer" class="fx-layer"></div><div id="boardGrid" class="grid" style="z-index:1"></div></div></div><div id="resultBanner" class="result-banner hidden"><div id="resultBannerTitle" class="result-banner-title"></div><div id="resultBannerDetail" class="result-banner-detail"></div></div></div>
 
     <aside class="side">
-      <div class="panel status-panel"><div class="pt">状态</div><div class="status-grid"><div class="stat status-wide"><div class="sl">房间</div><div id="roomText" class="sv status-text">尚未加入房间。</div></div><div class="stat"><div class="sl">回合</div><div id="round" class="sv">-</div></div><div class="stat"><div class="sl">进攻增援</div><div id="reinforce" class="sv">-</div></div><div class="stat status-wide"><div class="sl">规则</div><div id="configText" class="config-summary"></div></div></div></div>
+      <div class="panel status-panel"><div class="pt">状态</div><div class="status-grid"><div class="stat status-wide"><div class="sl">房间</div><div id="roomText" class="sv status-text">尚未加入房间。</div></div><div class="stat"><div class="sl">回合</div><div id="round" class="sv">-</div></div><div class="stat"><div class="sl">进攻增援</div><div id="reinforce" class="sv">-</div></div><div class="status-rules"><div class="sl">规则</div><div id="configText" class="config-summary"></div></div></div></div>
 
       <div class="panel"><div class="pt">部署</div><div id="deployHint" class="hint">进入房间后可操作。</div><div id="unitButtons" class="unit-buttons"></div></div>
 
@@ -984,6 +983,12 @@ function normalizeBoard(raw){
   if(!rows.length) return null;
   const inset=source.gridInset||{};
   const cellSize=source.cellSize||{};
+  const coordinateLayout=source.coordinateLayout&&typeof source.coordinateLayout==='object'
+    ? source.coordinateLayout : {};
+  const originX=Number.isFinite(Number(coordinateLayout.originX))
+    ? Number(coordinateLayout.originX) : 1;
+  const columnStep=Number.isFinite(Number(coordinateLayout.columnStep)) && Number(coordinateLayout.columnStep)>0
+    ? Number(coordinateLayout.columnStep) : null;
   const deploymentRows=source.deploymentRows||{};
   const deploymentAreas=source.deploymentAreas&&typeof source.deploymentAreas==='object'?source.deploymentAreas:{};
   const regions=source.regions&&typeof source.regions==='object'?source.regions:{};
@@ -999,6 +1004,7 @@ function normalizeBoard(raw){
     gridInset:{top:boundedNumber(inset.top,0,500,48),right:boundedNumber(inset.right,0,500,38),bottom:boundedNumber(inset.bottom,0,500,24),left:boundedNumber(inset.left,0,500,38)},
     cellSize:{width:boundedNumber(cellSize.width,44,300,116),height:boundedNumber(cellSize.height,44,240,90)},
     gap:boundedNumber(source.gap,0,80,12),
+    coordinateLayout:{originX,columnStep},
     deploymentRows:{
       attacker:isBoardRow(Number(deploymentRows.attacker))?Number(deploymentRows.attacker):null,
       defender:isBoardRow(Number(deploymentRows.defender))?Number(deploymentRows.defender):null
@@ -1088,9 +1094,15 @@ function ensureBoardLayout(){
     const defaultLeft=Math.max(0,(gridWidth-totalWidth)/2);
     row.cells.forEach((cell,index)=>{
       const cellEl=createCell(row,cell);
+      // A map owns its horizontal coordinates. Use the serialized left value
+      // first, then derive it from x/coordinateLayout, and only fall back to
+      // row centering for legacy maps that have neither representation.
+      const coordinateLeft=Number.isFinite(next.coordinateLayout?.columnStep) && Number.isFinite(cell.x)
+        ? (cell.x-next.coordinateLayout.originX)*next.coordinateLayout.columnStep
+        : null;
       const left=Number.isFinite(cell.left)
         ? cell.left
-        : defaultLeft+index*(next.cellSize.width+next.gap);
+        : (Number.isFinite(coordinateLeft) ? coordinateLeft : defaultLeft+index*(next.cellSize.width+next.gap));
       const top=Number.isFinite(cell.top) ? cell.top-row.top : 0;
       cellEl.style.position='absolute';
       cellEl.style.left=`${left}px`;
@@ -1230,7 +1242,16 @@ function toggleLog(){logCollapsed=!logCollapsed;document.getElementById('log').c
 function configSummary(){
   const c=state.config;
   const limits=max=>Object.entries(max||{}).map(([type,count])=>`${unitRule(type)?.short||unitRule(type)?.name||type}${count}`).join('/');
-  return `规则：${c.turnMode==='simultaneous'?'同时回合制':'轮流回合制'} · 增援 ${c.reinforcement} · 进攻 ${limits(c.attackerMax)} · 防守 ${limits(c.defenderMax)} · 行动后部署：${c.allowDeployAfterAction?'允许':'禁止'}`;
+  const roundLimit=Number(state.rules?.victory?.roundLimit?.round);
+  const box=(label,value)=>`<div class="rule-box"><div class="rule-box-label">${escapeHtml(label)}</div><div class="rule-box-value">${escapeHtml(value)}</div></div>`;
+  return [
+    box('回合制',c.turnMode==='simultaneous'?'同时':'轮流'),
+    box('回合上限',Number.isInteger(roundLimit)&&roundLimit>0?`${roundLimit}回合`:'无限制'),
+    box('增援',String(c.reinforcement)),
+    box('进攻兵力',limits(c.attackerMax)),
+    box('防守兵力',limits(c.defenderMax)),
+    box('行动后部署',c.allowDeployAfterAction?'允许':'禁止')
+  ].join('');
 }
 
 function render(){
@@ -1254,7 +1275,7 @@ function render(){
   document.getElementById('round').textContent=state.round;
   document.getElementById('reinforce').textContent=state.attackerReinforcement;
   document.getElementById('roomText').innerHTML=state?.roomName?`<strong>${escapeHtml(state.roomName)}</strong> · ${escapeHtml(state.variant?.name||state.variantId||'未知模式')} · ${state.gameMode==='ai'?`人机对战（${botDifficultyName(state.botDifficulty)}）`:'玩家对战'} · ${state.roomPlayerCount}/2 · ${role==='spectator'?'观战中':`你是${playerName(role)}`}${state.botRole?` · 机器人是${playerName(state.botRole)}`:''}${!state.started?' · 等待另一名玩家加入':''}`:'尚未加入房间。';
-  document.getElementById('configText').textContent=state.config?configSummary():'';
+  document.getElementById('configText').innerHTML=state.config?configSummary():'';
   const deployRow=boardLayout.deploymentRows?.[role];
   const deployLocation=Number.isInteger(deployRow)?`第${deployRow}行`:'指定部署区域';
   const mySubmitted=!!state.planning?.you?.submitted;

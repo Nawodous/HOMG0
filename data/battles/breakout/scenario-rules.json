@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "breakout-scenario",
-  "contentVersion": 7,
+  "contentVersion": 12,
   "requires": {
     "terrainTypes": "classic-terrain",
     "unitTypes": "classic-units",
@@ -16,7 +16,7 @@
       "kind": "deployment",
       "color": "#315f88",
       "borderColor": "#65a1dc",
-      "cells": ["7,0", "7,1", "7,2", "7,3", "7,4", "8,2", "8,3", "8,4", "9,3", "9,4"]
+      "cells": ["5,4", "5,5", "5,6", "6,4", "6,5", "6,6", "7,4", "7,5", "7,6"]
     },
     "defender-deployment": {
       "name": "防守部署",
@@ -25,9 +25,8 @@
       "color": "#78505a",
       "borderColor": "#df7178",
       "cells": [
-        "1,1",
-        "2,1", "2,5", "2,6",
-        "5.5,9", "6.5,9", "7.5,9", "8.5,9"
+        "1,7", "1,8",
+        "2,8", "3,0", "3,8", "3.5,9"
       ]
     },
     "attacker-goal": {
@@ -36,7 +35,7 @@
       "kind": "victory",
       "color": "#7a6730",
       "borderColor": "#f2cb68",
-      "cells": ["1,1", "2,5", "2,6", "5.5,9", "6.5,9", "7.5,9", "8.5,9"]
+      "cells": ["1,7", "1,8", "2,8", "3,0", "3,8", "3.5,9"]
     }
   },
   "deployment": {
@@ -47,15 +46,15 @@
     "unitProfiles": {
       "infantry": {
         "allowedPlayers": ["attacker", "defender"],
-        "deployLimit": { "attacker": 12, "defender": 6 }
+        "deployLimit": { "attacker": 12, "defender": 5 }
       },
       "antiTank": {
         "allowedPlayers": ["attacker", "defender"],
-        "deployLimit": { "attacker": 1, "defender": 2 }
+        "deployLimit": { "attacker": 1, "defender": 0 }
       },
       "machineGun": {
         "allowedPlayers": ["attacker", "defender"],
-        "deployLimit": { "attacker": 0, "defender": 3 }
+        "deployLimit": { "attacker": 0, "defender": 2 }
       }
     }
   },
@@ -65,8 +64,14 @@
   "victory": {
     "attackerTargetRegion": "attacker-goal",
     "reason": "attacker_reached_breakout_goal",
+    "roundLimit": {
+      "round": 28,
+      "winner": "defender",
+      "reason": "attacker_failed_before_round_limit"
+    },
     "messages": {
-      "attacker_reached_breakout_goal": "进攻方战棋到达突围目标区域。"
+      "attacker_reached_breakout_goal": "进攻方战棋到达突围目标区域。",
+      "attacker_failed_before_round_limit": "第28回合结束时进攻方仍未到达目标区域。"
     }
   }
 }

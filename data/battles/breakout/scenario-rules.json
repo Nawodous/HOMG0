@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "breakout-scenario",
-  "contentVersion": 12,
+  "contentVersion": 14,
   "requires": {
     "terrainTypes": "classic-terrain",
     "unitTypes": "classic-units",
@@ -16,7 +16,7 @@
       "kind": "deployment",
       "color": "#315f88",
       "borderColor": "#65a1dc",
-      "cells": ["5,4", "5,5", "5,6", "6,4", "6,5", "6,6", "7,4", "7,5", "7,6"]
+      "cells": ["5,4", "5.5,5", "5,6", "6,4", "6.5,5", "6,6", "7,4", "7.5,5", "7,6"]
     },
     "defender-deployment": {
       "name": "防守部署",
@@ -46,7 +46,7 @@
     "unitProfiles": {
       "infantry": {
         "allowedPlayers": ["attacker", "defender"],
-        "deployLimit": { "attacker": 12, "defender": 5 }
+        "deployLimit": { "attacker": 12, "defender": 4 }
       },
       "antiTank": {
         "allowedPlayers": ["attacker", "defender"],

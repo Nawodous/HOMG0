@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "classic",
-  "contentVersion": 4,
+  "contentVersion": 6,
   "name": "经典",
   "category": "battle",
   "enabled": true,
@@ -36,7 +36,7 @@
     "aiProfile": {
       "path": "ai-profiles/light-search.json",
       "id": "light-search",
-      "contentVersion": 1
+      "contentVersion": 3
     },
     "scenarioRules": null
   }

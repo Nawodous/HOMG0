@@ -6,7 +6,7 @@
       "manifest": {
         "path": "battles/classic/battle.json",
         "id": "classic",
-        "contentVersion": 4
+        "contentVersion": 6
       },
       "enabled": true
     },
@@ -15,7 +15,7 @@
       "manifest": {
         "path": "battles/breakout/battle.json",
         "id": "breakout",
-        "contentVersion": 13
+        "contentVersion": 16
       },
       "enabled": true
     }

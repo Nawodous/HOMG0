@@ -398,6 +398,14 @@ function normalizeAiProfileDefinition(raw, terrainTypes, unitTypes) {
   const evaluation = source.evaluation && typeof source.evaluation === 'object' ? source.evaluation : {};
   const unitProfiles = evaluation.unitProfiles && typeof evaluation.unitProfiles === 'object' ? evaluation.unitProfiles : {};
   const terrainScores = evaluation.terrainScores && typeof evaluation.terrainScores === 'object' ? evaluation.terrainScores : {};
+  const numericEvaluationGroups = {};
+  for (const group of ['deploymentScores', 'actionScores', 'stateWeights']) {
+    const sourceGroup = evaluation[group] && typeof evaluation[group] === 'object' ? evaluation[group] : {};
+    numericEvaluationGroups[group] = {};
+    for (const [name, value] of Object.entries(sourceGroup)) {
+      numericEvaluationGroups[group][name] = decimal(value, -1000000, 1000000, `evaluation.${group}.${name}`);
+    }
+  }
   for (const id of Object.keys(unitProfiles)) {
     if (!Object.hasOwn(unitTypes.unitTypes, id)) throw new Error(`AI profile references unknown unit type: ${id}`);
   }
@@ -411,11 +419,11 @@ function normalizeAiProfileDefinition(raw, terrainTypes, unitTypes) {
   for (const [id, value] of Object.entries(source.difficulties || {})) {
     if (!validDefinitionId(id) || !value || typeof value !== 'object') throw new Error(`AI profile has an invalid difficulty: ${id}`);
     difficulties[id] = {
-      searchDepth: integer(value.searchDepth, 1, 2, `${id}.searchDepth`),
+      searchDepth: integer(value.searchDepth, 1, 8, `${id}.searchDepth`),
       maxRootCandidates: integer(value.maxRootCandidates, 1, 32, `${id}.maxRootCandidates`),
       maxBranching: integer(value.maxBranching, 1, 12, `${id}.maxBranching`),
-      maxNodes: integer(value.maxNodes, 1, 128, `${id}.maxNodes`),
-      timeBudgetMs: integer(value.timeBudgetMs, 1, 50, `${id}.timeBudgetMs`),
+      maxNodes: integer(value.maxNodes, 1, 1024, `${id}.maxNodes`),
+      timeBudgetMs: integer(value.timeBudgetMs, 1, 100, `${id}.timeBudgetMs`),
       futureDiscount: decimal(value.futureDiscount, 0, 1, `${id}.futureDiscount`),
       topChoices: integer(value.topChoices, 1, 8, `${id}.topChoices`),
       nearBestWindow: decimal(value.nearBestWindow, 0, 1000, `${id}.nearBestWindow`),
@@ -438,7 +446,7 @@ function normalizeAiProfileDefinition(raw, terrainTypes, unitTypes) {
       maxStepsPerTurn: integer(execution.maxStepsPerTurn, 1, 500, 'execution.maxStepsPerTurn'),
       maxDeploymentsPerPlan: integer(execution.maxDeploymentsPerPlan, 1, 200, 'execution.maxDeploymentsPerPlan')
     },
-    evaluation: copyDefinition(evaluation),
+    evaluation: { ...copyDefinition(evaluation), ...numericEvaluationGroups },
     difficulties
   });
 }
@@ -1737,28 +1745,48 @@ function chooseRanked(items, difficulty, g = null) {
   return randomChoice(nearBest.slice(0, profile.topChoices));
 }
 
-function botDeployChoices(g, player) {
-  if (player === 'attacker' && g.attackerReinforcement <= 0) return [];
-  const emptyCells = deploymentCellsFor(g, player).filter(cell => !unitAt(g, cell.row, cell.col));
+function aiScore(g, group, name, fallback = 0) {
+  const value = Number(g.rules?.ai?.[group]?.[name]);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function botDeployChoices(g, player, planning = {}) {
+  const plannedCounts = planning.plannedCounts || {};
+  const pendingTotal = Object.values(plannedCounts).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  if (player === 'attacker' && g.attackerReinforcement - pendingTotal <= 0) return [];
+  const blockedCells = planning.blockedCells || new Set();
+  const emptyCells = deploymentCellsFor(g, player)
+    .filter(cell => !unitAt(g, cell.row, cell.col) && !blockedCells.has(key(cell.row, cell.col)));
   if (!emptyCells.length) return [];
 
   const maxima = g.config[player === 'attacker' ? 'attackerMax' : 'defenderMax'];
   const enemies = alive(g, opponentOf(player));
   const aiRules = g.rules?.ai || {};
   const roleBonuses = aiRules.roleBonuses || {};
+  const friendlyCount = alive(g, player).length + pendingTotal;
   return Object.keys(g.rules?.units || {}).flatMap(type => {
     if (!unitDefinition(type, g)?.allowedPlayers?.includes(player)) return [];
-    if (countType(g, player, type) >= (maxima[type] ?? 0)) return [];
+    const currentTypeCount = countType(g, player, type) + (Number(plannedCounts[type]) || 0);
+    const remainingCapacity = (maxima[type] ?? 0) - currentTypeCount;
+    if (remainingCapacity <= 0) return [];
     return emptyCells.map(cell => {
       const { row, col } = cell;
-      let score = unitValue(type, g) + 15;
-      score -= countType(g, player, type) * 9;
-      score += 10 - Math.abs(col - 2) * 4;
+      let score = unitValue(type, g) + aiScore(g, 'deploymentScores', 'base', 15);
+      score -= currentTypeCount * aiScore(g, 'deploymentScores', 'duplicatePenalty', 9);
+      score += Math.min(remainingCapacity, 3) * aiScore(g, 'deploymentScores', 'remainingCapacityBonus', 8);
+      score += neighbors(row, col, g.boardId).length * aiScore(g, 'deploymentScores', 'connectivityBonus', 3);
+      if (friendlyCount === 0) score += aiScore(g, 'deploymentScores', 'emptyArmyBonus', 120);
       if (unitDefinition(type, g)?.ai?.role === 'antiTank') score += enemies.reduce((sum, enemy) => sum + aiCombatBonus(g, { type }, enemy, enemy.row, enemy.col), 0);
       if (unitDefinition(type, g)?.ai?.role === 'machineGun' && !enemies.some(u => unitDefinition(u.type, g)?.ai?.role === 'antiTank')) score += Number(roleBonuses.machineGunWithoutAntiTank ?? 0);
       if (enemies.length) {
         const nearestDistance = Math.min(...enemies.map(u => graphDistance(row, col, u.row, u.col, g.boardId)));
-        score -= nearestDistance * 3;
+        score -= nearestDistance * aiScore(g, 'deploymentScores', 'enemyDistancePenalty', 3);
+      }
+      const goals = attackerVictoryCells(g);
+      if (goals.length) {
+        const goalDistance = Math.min(...goals.map(goal => graphDistance(row, col, Number(goal.row), Number(goal.col), g.boardId)));
+        const goalWeight = player === 'attacker' ? 'attackerGoalProximity' : 'defenderGoalProximity';
+        score -= goalDistance * aiScore(g, 'deploymentScores', goalWeight, player === 'attacker' ? 3 : 5);
       }
       return { type, row, col, score };
     });
@@ -1783,7 +1811,9 @@ function defensiveBlockValue(g, row, col) {
   if (!isAttackerVictoryCell(g, row, col)) return 0;
   let value = 0;
   for (const attacker of alive(g, 'attacker')) {
-    if (neighbors(attacker.row, attacker.col, g.boardId).some(([r, c]) => r === row && c === col)) value += 800;
+    if (neighbors(attacker.row, attacker.col, g.boardId).some(([r, c]) => r === row && c === col)) {
+      value += aiScore(g, 'actionScores', 'goalBlock', 800);
+    }
   }
   return value;
 }
@@ -1794,9 +1824,12 @@ function scoreShot(g, attacker, target) {
   }
 
   const kill = shotWouldKill(g, attacker, target);
-  let score = 95 + unitValue(target.type, g);
-  if (target.hits > 0) score += 125;
-  if (kill) score += 560 + unitValue(target.type, g) * 2;
+  let score = aiScore(g, 'actionScores', 'shotBase', 95) + unitValue(target.type, g);
+  if (target.hits > 0) score += aiScore(g, 'actionScores', 'damagedTarget', 125);
+  if (kill) {
+    score += aiScore(g, 'actionScores', 'killBase', 560)
+      + unitValue(target.type, g) * aiScore(g, 'actionScores', 'killValueMultiplier', 2);
+  }
   if (target.player === 'attacker') {
     const goalDistance = Math.min(...attackerVictoryCells(g).map(cell => graphDistance(target.row, target.col, Number(cell.row), Number(cell.col), g.boardId)));
     const distanceScores = g.rules?.ai?.attackerThreatScoresByGoalDistance || {};
@@ -1809,25 +1842,24 @@ function scoreShot(g, attacker, target) {
 function scoreMove(g, unit, target, difficulty) {
   const profile = botDifficultyProfile(g, difficulty);
   const enemies = alive(g, opponentOf(unit.player));
-  let score = -target.distance * 2;
+  let score = -target.distance * aiScore(g, 'actionScores', 'moveDistancePenalty', 2);
 
   if (unit.player === 'attacker') {
-    if (isAttackerVictoryCell(g, target.row, target.col)) return { score: 100000, priority: 'win' };
+    if (isAttackerVictoryCell(g, target.row, target.col)) return { score: aiScore(g, 'actionScores', 'win', 100000), priority: 'win' };
     const explicitTargets = g.rules?.victory?.attackerTargetCells;
     if (Array.isArray(explicitTargets) && explicitTargets.length) {
       const before = Math.min(...explicitTargets.map(cell => graphDistance(unit.row, unit.col, Number(cell.row), Number(cell.col), g.boardId)));
       const after = Math.min(...explicitTargets.map(cell => graphDistance(target.row, target.col, Number(cell.row), Number(cell.col), g.boardId)));
-      score += (before - after) * 62;
+      score += (before - after) * aiScore(g, 'actionScores', 'attackerProgress', 62);
     } else {
-      score += (unit.row - target.row) * 62;
-      score += (Math.max(...boardDefinition(g.boardId).rows.map(row => row.id)) - target.row) * 4;
+      score += (unit.row - target.row) * aiScore(g, 'actionScores', 'attackerProgress', 62);
     }
     const terrainScores = g.rules?.ai?.terrainScores || {};
     score += Number(terrainScores[terrainAt(target.row, target.col, g.boardId)] || 0);
   } else if (enemies.length) {
     const before = Math.min(...enemies.map(enemy => graphDistance(unit.row, unit.col, enemy.row, enemy.col, g.boardId)));
     const after = Math.min(...enemies.map(enemy => graphDistance(target.row, target.col, enemy.row, enemy.col, g.boardId)));
-    score += (before - after) * 34;
+    score += (before - after) * aiScore(g, 'actionScores', 'defenderEngagement', 34);
     score += defensiveBlockValue(g, target.row, target.col) - defensiveBlockValue(g, unit.row, unit.col);
   }
 
@@ -1836,12 +1868,12 @@ function scoreMove(g, unit, target, difficulty) {
       .filter(enemy => graphDistance(target.row, target.col, enemy.row, enemy.col, g.boardId) <= (Number(unitDefinition(unit.type, g)?.range) || 1))
       .map(enemy => scoreShot(g, { ...unit, row: target.row, col: target.col }, enemy).score)
       .reduce((best, value) => Math.max(best, value), 0);
-    score += bestFutureShot * 0.18;
+    score += bestFutureShot * aiScore(g, 'actionScores', 'futureShotMultiplier', 0.18);
   }
 
   const mobility = neighbors(target.row, target.col, g.boardId)
     .filter(([r, c]) => !unitAt(g, r, c) && canEnterTerrain(g, unit, r, c)).length;
-  score += mobility * 3 * profile.mobilityWeight;
+  score += mobility * aiScore(g, 'actionScores', 'moveMobility', 3) * profile.mobilityWeight;
   score -= threatAt(g, unit, target.row, target.col) * profile.dangerWeight;
   return { score, priority: 'move' };
 }
@@ -1862,7 +1894,9 @@ function botActionChoices(g, player, difficulty) {
     }
 
     const usefulShot = shots.some(target => canDamageAt(g, unit, target.type, target.row, target.col));
-    const stopScore = usefulShot || moves.length ? -35 : 5;
+    const stopScore = usefulShot || moves.length
+      ? aiScore(g, 'actionScores', 'stopWithOptions', -35)
+      : aiScore(g, 'actionScores', 'stopIdle', 5);
     actions.push({ type: 'stop', unitId: unit.id, score: stopScore, priority: 'stop' });
   }
   return actions;
@@ -1884,6 +1918,60 @@ function applyBotAction(g, player, action) {
   else endUnit(g, player, action.unitId);
 }
 
+function evaluateBotState(g, player) {
+  const terminal = aiScore(g, 'stateWeights', 'terminal', 100000);
+  if (g.state === 'ended') return g.winner === player ? terminal : -terminal;
+
+  const opponent = opponentOf(player);
+  const materialWeight = aiScore(g, 'stateWeights', 'material', 1);
+  const damageWeight = aiScore(g, 'stateWeights', 'damage', 0.6);
+  const terrainWeight = aiScore(g, 'stateWeights', 'terrain', 0.5);
+  const threatWeight = aiScore(g, 'stateWeights', 'threat', 0.7);
+  const mobilityWeight = aiScore(g, 'stateWeights', 'mobility', 3);
+  let score = 0;
+
+  for (const unit of g.units) {
+    const sign = unit.player === player ? 1 : -1;
+    const value = unitValue(unit.type, g);
+    score += sign * value * materialWeight;
+    score -= sign * unit.hits * value * damageWeight;
+    score += sign * Number(g.rules?.ai?.terrainScores?.[terrainAt(unit.row, unit.col, g.boardId)] || 0) * terrainWeight;
+    score -= sign * threatAt(g, unit, unit.row, unit.col) * threatWeight;
+    const mobility = neighbors(unit.row, unit.col, g.boardId)
+      .filter(([row, col]) => !unitAt(g, row, col) && canEnterTerrain(g, unit, row, col)).length;
+    score += sign * mobility * mobilityWeight;
+  }
+
+  const goals = attackerVictoryCells(g);
+  if (goals.length) {
+    const cellCount = boardDefinition(g.boardId).rows.reduce((sum, row) => sum + row.cells.length, 0);
+    const roundLimit = Number(g.rules?.victory?.roundLimit?.round);
+    const roundsLeft = Number.isFinite(roundLimit) ? Math.max(0, roundLimit - g.round) : null;
+    const urgencyWindow = aiScore(g, 'stateWeights', 'roundUrgencyWindow', 5);
+    const urgencyStep = aiScore(g, 'stateWeights', 'roundUrgencyStep', 0.2);
+    const urgency = roundsLeft == null ? 1 : 1 + Math.max(0, urgencyWindow - roundsLeft) * urgencyStep;
+    let attackerProgress = 0;
+    for (const unit of alive(g, 'attacker')) {
+      const distance = Math.min(...goals.map(goal => graphDistance(unit.row, unit.col, Number(goal.row), Number(goal.col), g.boardId)));
+      attackerProgress += (cellCount - Math.min(distance, cellCount)) * aiScore(g, 'stateWeights', 'attackerGoalProgress', 18) * urgency;
+      if (distance === 0) attackerProgress += aiScore(g, 'stateWeights', 'goalControl', 140);
+    }
+    let defenderCoverage = 0;
+    for (const unit of alive(g, 'defender')) {
+      const distance = Math.min(...goals.map(goal => graphDistance(unit.row, unit.col, Number(goal.row), Number(goal.col), g.boardId)));
+      defenderCoverage += (cellCount - Math.min(distance, cellCount)) * aiScore(g, 'stateWeights', 'defenderGoalProximity', 10);
+      if (distance === 0) defenderCoverage += aiScore(g, 'stateWeights', 'goalControl', 140);
+    }
+    score += (player === 'attacker' ? attackerProgress - defenderCoverage : defenderCoverage - attackerProgress);
+  }
+
+  const ownCapacity = Object.values(g.config[player === 'attacker' ? 'attackerMax' : 'defenderMax'] || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  const enemyCapacity = Object.values(g.config[opponent === 'attacker' ? 'attackerMax' : 'defenderMax'] || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  score += (Math.min(alive(g, player).length, ownCapacity) - Math.min(alive(g, opponent).length, enemyCapacity))
+    * aiScore(g, 'stateWeights', 'fieldPresence', 12);
+  return score;
+}
+
 function searchBotActions(g, player, difficulty, choices) {
   const profile = botDifficultyProfile(g, difficulty);
   if (profile.searchDepth < 2 || profile.futureDiscount <= 0) return choices;
@@ -1893,9 +1981,35 @@ function searchBotActions(g, player, difficulty, choices) {
     .slice(0, profile.maxRootCandidates);
   const evaluated = [];
   let nodes = 0;
+  const stateChangeWeight = aiScore(g, 'stateWeights', 'stateChange', 0.45);
+
+  const continuationScore = (state, depth, stateScore) => {
+    if (depth <= 0 || state.state !== 'playing' || nodes >= profile.maxNodes || Date.now() >= deadline) return 0;
+    const candidates = botActionChoices(state, player, difficulty)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, profile.maxBranching);
+    let best = Number.NEGATIVE_INFINITY;
+    for (const candidate of candidates) {
+      if (nodes >= profile.maxNodes || Date.now() >= deadline) break;
+      const child = cloneGameForBotSearch(state);
+      try {
+        applyBotAction(child, player, candidate);
+        nodes++;
+      } catch (_) {
+        continue;
+      }
+      const childScore = evaluateBotState(child, player);
+      const future = continuationScore(child, depth - 1, childScore);
+      const total = candidate.score + (childScore - stateScore) * stateChangeWeight + future * profile.futureDiscount;
+      best = Math.max(best, total);
+    }
+    return Number.isFinite(best) ? best : 0;
+  };
+
+  const initialStateScore = evaluateBotState(g, player);
 
   for (const action of roots) {
-    if (nodes >= profile.maxNodes || Date.now() > deadline) break;
+    if (nodes >= profile.maxNodes || Date.now() >= deadline) break;
     const simulated = cloneGameForBotSearch(g);
     try {
       applyBotAction(simulated, player, action);
@@ -1904,18 +2018,12 @@ function searchBotActions(g, player, difficulty, choices) {
       continue;
     }
 
-    let futureScore = 0;
-    if (simulated.state === 'playing') {
-      const continuations = botActionChoices(simulated, player, difficulty)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, Math.min(profile.maxBranching, profile.maxNodes - nodes));
-      for (const continuation of continuations) {
-        if (nodes >= profile.maxNodes || Date.now() > deadline) break;
-        futureScore = Math.max(futureScore, continuation.score);
-        nodes++;
-      }
-    }
-    evaluated.push({ ...action, searchScore: action.score + futureScore * profile.futureDiscount });
+    const simulatedScore = evaluateBotState(simulated, player);
+    const futureScore = continuationScore(simulated, profile.searchDepth - 1, simulatedScore);
+    evaluated.push({
+      ...action,
+      searchScore: action.score + (simulatedScore - initialStateScore) * stateChangeWeight + futureScore * profile.futureDiscount
+    });
   }
   return evaluated.length ? evaluated : choices;
 }
@@ -1932,19 +2040,14 @@ function chooseBotAction(g, player, difficulty) {
 function buildBotSimultaneousPlan(g, player, difficulty) {
   const plan = createSimultaneousPlan();
   const blockedCells = new Set(g.units.map(unit => key(unit.row, unit.col)));
-  const counts = Object.fromEntries(Object.keys(g.rules?.units || {}).map(type => [type, countType(g, player, type)]));
-  const maxima = g.config[player === 'attacker' ? 'attackerMax' : 'defenderMax'] || {};
-  let reinforcement = g.attackerReinforcement;
+  const plannedCounts = Object.fromEntries(Object.keys(g.rules?.units || {}).map(type => [type, 0]));
   const execution = botExecutionProfile(g);
   for (let i = 0; i < execution.maxStepsPerTurn; i++) {
-    const choice = chooseRanked(botDeployChoices(g, player).filter(item => !blockedCells.has(key(item.row, item.col))), difficulty, g);
+    const choice = chooseRanked(botDeployChoices(g, player, { blockedCells, plannedCounts }), difficulty, g);
     if (!choice) break;
-    if (counts[choice.type] >= (maxima[choice.type] ?? 0)) break;
-    if (player === 'attacker' && reinforcement <= 0) break;
     plan.deployments.push({ type: choice.type, row: choice.row, col: choice.col });
     blockedCells.add(key(choice.row, choice.col));
-    counts[choice.type] = (counts[choice.type] || 0) + 1;
-    if (player === 'attacker') reinforcement--;
+    plannedCounts[choice.type] = (plannedCounts[choice.type] || 0) + 1;
     if (plan.deployments.length >= execution.maxDeploymentsPerPlan) break;
   }
   for (const unit of g.units.filter(item => item.player === player && item.canAct && item.deployedRound !== g.round)) {
@@ -1984,6 +2087,10 @@ function scheduleBotTurn(room, delay = null) {
   }, effectiveDelay);
 }
 
+function botShouldCheckDeployment(g, completedTurn, currentTurn) {
+  return completedTurn !== currentTurn || g.config.allowDeployAfterAction === true;
+}
+
 function runBotStep(room) {
   if (rooms.get(room.id) !== room) return;
   const g = room.game;
@@ -2005,10 +2112,7 @@ function runBotStep(room) {
       return;
     }
 
-    if (room.botDeployTurn !== turnKey) {
-      // Deployment is repeatable within a turn. Keep taking legal deployment
-      // choices until the row, reinforcement, or per-type caps are exhausted;
-      // only then mark the deployment phase complete and begin unit actions.
+    if (botShouldCheckDeployment(g, room.botDeployTurn, turnKey)) {
       const choice = chooseBotDeployment(g, player, room.botDifficulty);
       if (choice) {
         deploy(g, player, choice.type, choice.row, choice.col);
@@ -2467,6 +2571,9 @@ module.exports = {
     normalizeBotDifficulty,
     chooseBotDeployment,
     chooseBotAction,
+    botShouldCheckDeployment,
+    buildBotSimultaneousPlan,
+    evaluateBotState,
     createSimultaneousPlan,
     serializePlan,
     deserializePlan,
